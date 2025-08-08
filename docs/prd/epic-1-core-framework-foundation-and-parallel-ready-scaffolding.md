@@ -3,14 +3,15 @@
 
 **Story 1.1: Bootstrap `hex-core` Modules and Project Structure**
 As a framework maintainer,
-I want a multi-module Maven structure with `hex-core-api`, `hex-core-ui`, and `hex-core-testing`,
-so that teams can import focused modules and avoid unrelated dependencies.
+I want a multi-module Maven structure with a base `hex-core` and specialized `hex-core-api`, `hex-core-ui`, and `hex-core-testing` modules,
+so that teams can import focused modules and common abstractions are reused.
 **Acceptance Criteria:**
-1. A Maven parent POM defines modules `hex-core-api`, `hex-core-ui`, `hex-core-testing`, and a sample `hex-project-samples`.
-2. Shared dependency management with pinned versions for Java 17, RestAssured, Selenide, JUnit 5, Allure, Owner, SLF4J/Logback, Lombok, JavaFaker.
-3. Each module builds successfully locally and in CI.
-4. Sample project depends on `hex-core-*` without test flakiness in a single-thread run.
-5. All module READMEs and Javadocs are created in Russian.
+1. A Maven parent POM defines modules `hex-core`, `hex-core-api`, `hex-core-ui`, `hex-core-testing`, and a sample `hex-project-samples`.
+2. `hex-core` contains common abstractions (DI, config); `hex-core-api/ui/testing` depend on `hex-core`.
+3. Shared dependency management includes pinned versions for Java 17, RestAssured, Selenide, JUnit 5, Allure, Owner, SLF4J/Logback, Lombok, JavaFaker, and AssertJ.
+4. Each module builds successfully locally and in CI.
+5. Sample project depends on `hex-core-*` without test flakiness in a single-thread run.
+6. All module READMEs and Javadocs are created in Russian.
 
 **Story 1.2: Owner Configuration and DI Pattern**
 As a test developer,

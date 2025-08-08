@@ -14,5 +14,6 @@ Hex is a modular Java 17/Maven automation framework unifying UI (Selenide) and A
 ### Change Log
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
+| 2025-01-XX | 1.1 | Aligned with architecture v1.0 | PM |
 | 2025-01-XX | 1.0 | Initial PRD draft | PM |
 

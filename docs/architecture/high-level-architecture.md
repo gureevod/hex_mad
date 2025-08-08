@@ -17,17 +17,17 @@ The primary data flow for a test is as follows:
 ### High Level Project Diagram
 ```mermaid
 graph TD
-    subgraph Monorepo ["Maven Monorepo"]
+    subgraph Monorepo (Maven)
         direction LR
         ParentPOM("Parent POM")
 
-        subgraph CoreModules ["Core Modules"]
+        subgraph Core Modules
             CoreAPI("hex-core-api")
             CoreUI("hex-core-ui")
             CoreTesting("hex-core-testing")
         end
 
-        subgraph SampleImpl ["Sample Implementation"]
+        subgraph Sample Implementation
             SampleProject("hex-project-samples")
         end
 
@@ -36,12 +36,12 @@ graph TD
         ParentPOM --> CoreTesting
         ParentPOM --> SampleProject
 
-        SampleProject --> CoreAPI
-        SampleProject --> CoreUI
-        SampleProject --> CoreTesting
+        SampleProject -- depends on --> CoreAPI
+        SampleProject -- depends on --> CoreUI
+        SampleProject -- depends on --> CoreTesting
     end
 
-    subgraph ExtDeps ["External Dependencies"]
+    subgraph External Dependencies
         RestAssured("RestAssured")
         Selenide("Selenide")
         JUnit5("JUnit 5")
@@ -56,7 +56,7 @@ graph TD
     CoreTesting --> Allure
     CoreTesting --> Owner
     CoreTesting --> SLF4J
-```
+
 
 ### Architectural and Design Patterns
 - **Modular Monorepo:** Using a Maven parent POM to manage shared dependencies, plugins, and build lifecycle for all `hex-*` modules. _Rationale:_ Simplifies versioning, ensures consistency, and allows for atomic commits across related modules.

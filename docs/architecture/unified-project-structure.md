@@ -1,70 +1,76 @@
-# Source Tree
+# Source Tree (Revised)
 
-The Hex framework will be organized as a Maven multi-module project within a single monorepo. This structure facilitates shared dependency management, consistent build processes, and atomic commits across the framework's components.
+The Hex framework will be organized as a Maven multi-module project within a single monorepo. A new `hex-core` module will house common abstractions to prevent dependency cycles and promote reuse.
 
 ```plaintext
 hex-automation-framework/
 ├── .github/
 │   └── workflows/
-│       └── ci.yaml                     # GitHub Actions CI/CD pipeline
+│       └── ci.yaml
+├── hex-core/
+│   ├── src/
+│   │   ├── main/
+│   │   │   └── java/
+│   │   │       └── com/company/hex/core/
+│   │   │           ├── config/         # Core Owner interfaces, ConfigFactory
+│   │   │           ├── di/             # Core DI Provider interfaces
+│   │   │           └── utils/          # Common utilities (e.g., reflection, string helpers)
+│   │   └── test/
+│   │       └── java/                   # Unit tests for core components
+│   └── pom.xml                         # Module POM for hex-core
 ├── hex-core-api/
 │   ├── src/
 │   │   ├── main/
 │   │   │   └── java/
 │   │   │       └── com/company/hex/api/
-│   │   │           ├── config/         # Owner interfaces for API config
-│   │   │           ├── dto/            # Base DTO interfaces/classes
-│   │   │           └── service/        # BaseApiService and helpers
+│   │   │           ├── dto/            # Base DTO interfaces
+│   │   │           └── service/        # BaseApiService and RestAssured helpers
 │   │   └── test/
-│   │       └── java/                   # Unit tests for core API components
-│   └── pom.xml                         # Module POM for hex-core-api
+│   │       └── java/
+│   └── pom.xml                         # Depends on hex-core
 ├── hex-core-ui/
 │   ├── src/
 │   │   ├── main/
 │   │   │   └── java/
 │   │   │       └── com/company/hex/ui/
-│   │   │           ├── config/         # Owner interfaces for UI config
 │   │   │           ├── core/           # BaseElement, BaseComponent
 │   │   │           └── wrappers/       # Button, Input, Select, etc.
 │   │   └── test/
-│   │       └── java/                   # Unit tests for core UI components
-│   └── pom.xml                         # Module POM for hex-core-ui
+│   │       └── java/
+│   └── pom.xml                         # Depends on hex-core
 ├── hex-core-testing/
 │   ├── src/
 │   │   ├── main/
 │   │   │   └── java/
 │   │   │       └── com/company/hex/testing/
 │   │   │           ├── allure/         # Allure integration helpers
-│   │   │           ├── config/         # ConfigFactory
-│   │   │           ├── di/             # DI Providers/Factories
-│   │   │           ├── lifecycle/      # BaseTest, JUnit extensions
-│   │   │           └── logging/        # Logging configuration helpers
+│   │   │           └── lifecycle/      # BaseTest, JUnit extensions
 │   │   └── test/
-│   │       └── java/                   # Unit tests for core testing components
-│   └── pom.xml                         # Module POM for hex-core-testing
+│   │       └── java/
+│   └── pom.xml                         # Depends on hex-core
 ├── hex-project-samples/
 │   ├── src/
 │   │   ├── main/
 │   │   │   └── java/
 │   │   │       └── com/company/hex/project/
 │   │   │           ├── api/
-│   │   │           │   ├── dto/        # Project-specific DTOs (generated)
-│   │   │           │   └── services/   # Project-specific API services
-│   │   │           ├── pages/          # PageObjects
-│   │   │           ├── components/     # Custom composite components
-│   │   │           └── config/         # Project-specific configuration
+│   │   │           │   ├── dto/
+│   │   │           │   └── services/
+│   │   │           ├── pages/
+│   │   │           ├── components/
+│   │   │           └── config/
 │   │   └── test/
 │   │       └── java/
 │   │           └── com/company/hex/project/tests/
-│   │               ├── api/            # API tests
-│   │               └── ui/             # UI tests
-│   ├── pom.xml                         # Module POM for the sample project
-│   └── Jenkinsfile.groovy              # CI/CD pipeline definition for samples
+│   │               ├── api/
+│   │               └── ui/
+│   ├── pom.xml                         # Depends on all hex-core-* modules
+│   └── Jenkinsfile.groovy
 ├── docs/
-│   ├── architecture.md                 # This document
-│   └── prd.md                          # Product Requirements Document
+│   ├── architecture.md
+│   └── prd.md
 ├── .gitignore
-├── pom.xml                             # Parent POM for the entire monorepo
-└── README.md                           # Project-level README (in Russian)
+├── pom.xml                             # Parent POM
+└── README.md
 ```
-
+

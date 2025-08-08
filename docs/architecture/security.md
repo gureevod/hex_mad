@@ -37,4 +37,3 @@ This section outlines the mandatory security requirements and patterns for the H
 
 ### Security Testing
 - **SAST (Static Application Security Testing):** A SAST tool (e.g., SonarQube, Snyk Code) will be integrated into the CI pipeline to scan the framework's own codebase for potential security vulnerabilities.
-

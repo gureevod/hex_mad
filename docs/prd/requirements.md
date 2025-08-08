@@ -13,7 +13,7 @@
 10. FR10: Provide logging standards based on SLF4J API and Logback implementation with redaction patterns for secrets/PII.
 11. FR11: Provide configuration standards (Owner) with profiles for local vs CI, immutable per-thread snapshots, and Vault secret retrieval pattern documentation.
 12. FR12: Ensure thread-safe WebDriver/Selenide lifecycle with per-thread sessions and no shared mutable state.
-13. FR13: Provide compatibility matrix for Java 17, Selenide, RestAssured, JUnit 5, Allure, Owner, SLF4J/Logback, Lombok, and JavaFaker.
+13. FR13: Provide compatibility matrix for Java 17, Selenide, RestAssured, JUnit 5, Allure, Owner, SLF4J/Logback, Lombok, JavaFaker, and AssertJ.
 14. FR14: Provide sample API contract validation examples (schemas).
 15. FR15: Provide examples and guidance for composite component integration into PageObjects and business logic encapsulation.
 16. FR16: Provide documentation and patterns for migrating teams to adopt API-only, then UI wrappers, then full core incrementally.

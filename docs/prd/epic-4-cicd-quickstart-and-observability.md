@@ -6,10 +6,11 @@ As a team lead,
 I want a ready-to-use `Jenkinsfile.groovy`,
 so that teams can run tests in parallel with artifacts and Allure.
 **Acceptance Criteria:**
-1. Stages for checkout, build, test (matrix), and report publish.
-2. Environment matrix support (e.g., tags or profiles).
-3. Archive test reports/logs and publish Allure.
-4. Example parameters and documentation for customization.
+1. A sample `Jenkinsfile.groovy` is provided in the `hex-project-samples` module.
+2. It defines stages for checkout, build, test (matrix), and report publish.
+3. Environment matrix support (e.g., tags or profiles) is demonstrated.
+4. It archives test reports/logs and publishes the Allure report.
+5. Example parameters and customization documentation are provided in Russian.
 
 **Story 4.2: Logging and Redaction Standards**
 As a security-conscious maintainer,

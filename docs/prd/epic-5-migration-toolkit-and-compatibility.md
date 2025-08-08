@@ -6,10 +6,10 @@ As a maintainer,
 I want a compatibility matrix,
 so that teams know supported versions across libraries.
 **Acceptance Criteria:**
-1. Matrix for Java 17, Selenide, RestAssured, JUnit 5, Allure, Owner, SLF4J/Logback, Lombok, JavaFaker, jsonschema2pojo.
-2. Semantic versioning and upgrade notes for `hex-core`.
-3. Example upgrade path notes for minor/patch bumps.
-4. Publication in repo docs in Russian.
+1. Matrix for Java 17, Selenide, RestAssured, JUnit 5, Allure, Owner, SLF4J/Logback, Lombok, JavaFaker, AssertJ, and jsonschema2pojo is created.
+2. Semantic versioning and upgrade notes for `hex-core` modules are documented.
+3. Example upgrade path notes for minor/patch bumps are provided.
+4. The matrix is published in the repository documentation in Russian.
 
 **Story 5.2: Migration Guides and Patterns**
 As a migrating team,
@@ -26,8 +26,7 @@ As a team lead,
 I want minimal samples,
 so that we can adopt one layer at a time.
 **Acceptance Criteria:**
-1. `hex-samples-api-only` and `hex-samples-ui-api` modules.
+1. `hex-samples-api-only` and `hex-samples-ui-api` modules are provided.
 2. Clear READMEs in Russian on adding dependencies and running tests.
 3. Allure/Logback/Owner configuration examples included.
 4. Parallel run notes and troubleshooting.
-
