@@ -25,7 +25,8 @@ This section serves as the single source of truth for all technology and depende
 | **Logging API** | SLF4J API | 2.0.13 | Logging facade | Decouples framework from a specific logging implementation. |
 | **Logging Impl** | Logback Classic | 1.5.6 | Logging implementation | Powerful, fast, and highly configurable logging backend for SLF4J. |
 | **Boilerplate** | Project Lombok | 1.18.32 | Code generation library | Drastically reduces boilerplate for DTOs, builders, and models. |
+| **Dependency Injection** | Google Guice | 7.0.0 | Lightweight dependency injection framework | Provides compile-time safe dependency injection with minimal configuration overhead. |
 | **Test Data** | JavaFaker | 1.0.2 | Realistic test data generation | Simple API for creating fake data (names, addresses, etc.) for tests. |
 | **DTO Generation**| jsonschema2pojo | 1.2.1 | DTO generation from JSON Schema | Automates creation of POJOs from API contracts, ensuring consistency. |
 | **Assertions** | AssertJ | 3.25.3 | Fluent assertions library | Provides highly readable and expressive assertions for tests. |
-
+

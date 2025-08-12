@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.company.hex</groupId>
+        <artifactId>hex-automation-framework</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>hex-project-samples</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Hex Project Samples</name>
+    <description>Sample project demonstrating usage of all hex-core-* modules</description>
+
+    <dependencies>
+        <!-- All Hex Core Modules -->
+        <dependency>
+            <groupId>com.company.hex</groupId>
+            <artifactId>hex-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.company.hex</groupId>
+            <artifactId>hex-core-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.company.hex</groupId>
+            <artifactId>hex-core-ui</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.company.hex</groupId>
+            <artifactId>hex-core-testing</artifactId>
+        </dependency>
+
+        <!-- Test Data Generation -->
+        <dependency>
+            <groupId>com.github.javafaker</groupId>
+            <artifactId>javafaker</artifactId>
+        </dependency>
+
+        <!-- Utilities -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Test Dependencies -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

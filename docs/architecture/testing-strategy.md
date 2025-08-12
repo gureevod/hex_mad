@@ -23,7 +23,7 @@ This section outlines the strategy for testing the Hex framework's own component
         - Follow the AAA pattern (Arrange, Act, Assert).
         - Mock all external dependencies (e.g., mock a `SelenideElement` when testing a wrapper).
 - **Integration Tests:**
-    - **Scope:** To verify interactions between components within the Hex framework itself, not with an external application. For example, testing that the DI provider correctly constructs a service with a configuration object.
+    - **Scope:** To verify interactions between components within the Hex framework itself, not with an external application. For example, testing that the Google Guice injector correctly constructs a service with a configuration object.
     - **Location:** Within the `src/test/java` directory, but using a specific JUnit tag (`@Tag("integration")`) to separate them from fast-running unit tests.
     - **Test Infrastructure:** No external infrastructure needed. These tests will run entirely in-memory.
 - **End-to-End (E2E) Tests:**
@@ -39,4 +39,4 @@ This section outlines the strategy for testing the Hex framework's own component
 
 ### Continuous Testing
 - **CI Integration:** The Maven build (`mvn clean install`) will automatically run all unit and integration tests. A failure in any test will fail the entire CI build. The `hex-project-samples` tests will be run in a separate, dedicated stage in the `Jenkinsfile.groovy`.
-
+

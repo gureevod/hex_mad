@@ -25,8 +25,8 @@ The Hex framework is decomposed into several key logical components, each implem
 **Key Interfaces:**
 - `BaseTest`: A base test class for JUnit 5 that manages test lifecycle, DI context, and integration with Allure and logging.
 - `ConfigFactory`: A utility for creating and managing thread-safe configuration instances.
-- `DiProvider`: Interfaces and patterns for the lightweight dependency injection system.
-**Dependencies:** JUnit 5, Allure, Owner, SLF4J/Logback. It has optional dependencies on `hex-core-api` and `hex-core-ui`.
+- `GuiceModule`: Google Guice modules for dependency injection configuration and binding.
+**Dependencies:** JUnit 5, Allure, Owner, Google Guice, SLF4J/Logback. It has optional dependencies on `hex-core-api` and `hex-core-ui`.
 **Technology Stack:** This component integrates the test runner (JUnit 5) with reporting, configuration, and logging libraries.
 
 ### `hex-project-samples` (Implementation Example)
@@ -73,4 +73,4 @@ graph TD
     CoreUI --> Selenide
     CoreAPI --> RestAssured
 ```
-
+

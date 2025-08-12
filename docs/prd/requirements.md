@@ -6,7 +6,7 @@
 3. FR3: Enable user-defined composite components via base abstractions and patterns, embeddable in PageObjects; do not ship concrete composites in `hex-core`.
 4. FR4: Provide standardized API service layer patterns (DTOs/models and service classes) with request/response schemas and error handling guidelines; leverage Lombok to reduce boilerplate.
 5. FR5: Provide JUnit 5 parallel-ready test scaffolds (base test classes, tags, lifecycle) for both UI and API, including isolated per-thread contexts and example JavaFaker usage for test data.
-6. FR6: Provide DI wiring pattern (providers/factories) avoiding global singletons; enable test-time wiring for services, components, and configs.
+6. FR6: Provide Google Guice DI wiring pattern avoiding global singletons; enable test-time wiring for services, components, and configs.
 7. FR7: Provide Jenkins quickstart `Jenkinsfile.groovy` with parallel stages, environment matrix support, and Allure report publishing.
 8. FR8: Provide templates/samples for API-only adoption and combined UI+API adoption; include minimal starter `hex-project` examples.
 9. FR9: Provide Allure reporting standards and integration for both UI and API layers with consistent step logging.
@@ -33,4 +33,4 @@
 9. NFR9: Extensibility: Well-defined extension points for wrappers, components, services, and configuration without modifying `hex-core`.
 10. NFR10: Documentation: Provide clear examples (3–5 at launch) and patterns; maintain version compatibility matrix.
 11. NFR11: All code docs, inline comments, Javadoc, and all user-facing READMEs must be written in Russian.
-
+

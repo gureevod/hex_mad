@@ -60,10 +60,10 @@ graph TD
 
 ### Architectural and Design Patterns
 - **Modular Monorepo:** Using a Maven parent POM to manage shared dependencies, plugins, and build lifecycle for all `hex-*` modules. _Rationale:_ Simplifies versioning, ensures consistency, and allows for atomic commits across related modules.
-- **Dependency Injection (Provider/Factory Pattern):** A lightweight, custom DI approach using factory methods or provider classes to supply dependencies like WebDriver sessions or API clients. _Rationale:_ Avoids heavy DI frameworks (like Spring/Guice) and global singletons, promoting test-time flexibility and explicit, thread-safe dependency management.
+- **Dependency Injection (Google Guice):** Uses Google Guice for lightweight dependency injection to supply dependencies like WebDriver sessions or API clients. _Rationale:_ Provides compile-time safe dependency injection with minimal configuration overhead, promoting test-time flexibility and explicit, thread-safe dependency management.
 - **Wrapper/Decorator Pattern:** Used for creating extensible wrappers around `SelenideElement` (e.g., `Button`, `Input`). _Rationale:_ Adds behavior like logging, custom waits, and business-centric assertions to base elements without altering Selenide's core.
 - **Composite Pattern:** The foundation for user-defined UI components that group multiple element wrappers into a single, reusable business-level object (e.g., a `LoginForm` component). _Rationale:_ Enables building complex, hierarchical UI structures that are managed as a single unit.
 - **Page Object Model (POM):** A standard UI testing pattern that will be implemented using the framework's wrappers and composite components. _Rationale:_ Separates UI interaction logic from test logic, improving maintainability and readability.
 - **Service Layer Pattern:** For the API testing layer, where `Service` classes encapsulate endpoint interactions, request building, and response parsing. _Rationale:_ Abstracts the details of HTTP communication (via RestAssured) and provides a clean, business-oriented API for tests.
 - **Immutable Objects:** Configuration objects provided by Owner will be treated as immutable snapshots for each thread. _Rationale:_ This is critical for achieving thread-safety and preventing state corruption during parallel test execution.
-
+

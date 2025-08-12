@@ -1,5 +1,5 @@
 # Epic 1: Core Framework Foundation and Parallel-Ready Scaffolding
-**Epic Goal:** Deliver the initial `hex-core` modules and parallel-ready scaffolding so teams can run both API and UI sample tests with Allure in ≤ 60 minutes. Establish DI patterns, configuration via Owner, logging via SLF4J/Logback with redaction, reporting via Allure, and JUnit 5 parallel execution with thread-safe defaults.
+**Epic Goal:** Deliver the initial `hex-core` modules and parallel-ready scaffolding so teams can run both API and UI sample tests with Allure in ≤ 60 minutes. Establish Google Guice DI patterns, configuration via Owner, logging via SLF4J/Logback with redaction, reporting via Allure, and JUnit 5 parallel execution with thread-safe defaults.
 
 **Story 1.1: Bootstrap `hex-core` Modules and Project Structure**
 As a framework maintainer,
@@ -7,20 +7,20 @@ I want a multi-module Maven structure with a base `hex-core` and specialized `he
 so that teams can import focused modules and common abstractions are reused.
 **Acceptance Criteria:**
 1. A Maven parent POM defines modules `hex-core`, `hex-core-api`, `hex-core-ui`, `hex-core-testing`, and a sample `hex-project-samples`.
-2. `hex-core` contains common abstractions (DI, config); `hex-core-api/ui/testing` depend on `hex-core`.
+2. `hex-core` contains common abstractions (Google Guice DI, config); `hex-core-api/ui/testing` depend on `hex-core`.
 3. Shared dependency management includes pinned versions for Java 17, RestAssured, Selenide, JUnit 5, Allure, Owner, SLF4J/Logback, Lombok, JavaFaker, and AssertJ.
 4. Each module builds successfully locally and in CI.
 5. Sample project depends on `hex-core-*` without test flakiness in a single-thread run.
 6. All module READMEs and Javadocs are created in Russian.
 
-**Story 1.2: Owner Configuration and DI Pattern**
+**Story 1.2: Owner Configuration and Google Guice DI Pattern**
 As a test developer,
-I want Owner-backed configuration and a lightweight provider/factory DI pattern,
-so that test-time wiring is clear and no global singletons are required.
+I want Owner-backed configuration and Google Guice dependency injection,
+so that test-time wiring is clear and type-safe with minimal configuration overhead.
 **Acceptance Criteria:**
 1. Owner interfaces support environment profiles (local, CI) and immutable per-thread snapshots.
-2. DI pattern documented with provider/factory classes; no static mutable singletons.
-3. Example wiring for API client and UI driver/session via providers.
+2. Google Guice modules documented with proper binding configuration; no static mutable singletons.
+3. Example wiring for API client and UI driver/session via Guice injection.
 4. Unit tests verify configuration snapshot immutability and per-thread scoping.
 
 **Story 1.3: Logging and Reporting Baseline**
@@ -52,4 +52,4 @@ so that I can verify setup and reporting end-to-end quickly.
 2. UI sample test interacts with a simple demo page (input + button); Allure steps present.
 3. Both samples runnable locally and in CI; artifacts archived; Allure report published.
 4. Time-to-first-test path documented (≤ 60 minutes) in Russian.
-
+

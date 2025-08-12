@@ -13,7 +13,7 @@ hex-automation-framework/
 │   │   │   └── java/
 │   │   │       └── com/company/hex/core/
 │   │   │           ├── config/         # Core Owner interfaces, ConfigFactory
-│   │   │           ├── di/             # Core DI Provider interfaces
+│   │   │           ├── di/             # Google Guice modules and provider interfaces
 │   │   │           └── utils/          # Common utilities (e.g., reflection, string helpers)
 │   │   └── test/
 │   │       └── java/                   # Unit tests for core components
@@ -73,4 +73,4 @@ hex-automation-framework/
 ├── pom.xml                             # Parent POM
 └── README.md
 ```
-
+
