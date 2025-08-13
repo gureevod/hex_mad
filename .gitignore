@@ -3,6 +3,8 @@
 
 .idea
 .vscode
+target/*
+hex-core/target/*
 hex-core-api/target/*
 hex-core-testing/target/*
 hex-core-ui/target/*
