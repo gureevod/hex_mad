@@ -12,3 +12,4 @@ hex-core-common/target/*
 hex-project-samples/target/*
 hex-project-samples/allure-results/*
 hex-automation-framework/target/*
+hex-project-samples/.allure/

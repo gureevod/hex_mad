@@ -49,6 +49,16 @@
             <artifactId>slf4j-api</artifactId>
         </dependency>
 
+        <!-- Reporting -->
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-junit5</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-selenide</artifactId>
+        </dependency>
+
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

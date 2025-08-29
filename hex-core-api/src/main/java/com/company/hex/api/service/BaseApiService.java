@@ -2,6 +2,8 @@ package com.company.hex.api.service;
 
 import com.company.hex.api.config.ApiConfig;
 import com.company.hex.core.config.HexConfigFactory;
+import com.company.hex.core.logging.HexLoggerFactory;
+import io.qameta.allure.restassured.AllureRestAssured;
 import io.restassured.RestAssured;
 import io.restassured.config.RestAssuredConfig;
 import io.restassured.config.SSLConfig;
@@ -9,7 +11,6 @@ import io.restassured.filter.log.RequestLoggingFilter;
 import io.restassured.filter.log.ResponseLoggingFilter;
 import io.restassured.specification.RequestSpecification;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Базовый абстрактный класс для всех API сервисов.
@@ -20,7 +21,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseApiService {
 
-    protected final Logger logger = LoggerFactory.getLogger(this.getClass());
+    protected final Logger logger = HexLoggerFactory.getApiLogger(this.getClass());
     protected final ApiConfig config;
     protected final RequestSpecification requestSpec;
 
@@ -31,7 +32,8 @@ public abstract class BaseApiService {
     protected BaseApiService() {
         this.config = HexConfigFactory.getConfig(ApiConfig.class);
         this.requestSpec = createRequestSpecification();
-        logger.info("Инициализирован API сервис: {}", this.getClass().getSimpleName());
+        logger.info("🌐 Инициализирован API сервис: {} [BaseURL: {}]",
+                   this.getClass().getSimpleName(), config.baseUrl());
     }
 
     /**
@@ -42,7 +44,8 @@ public abstract class BaseApiService {
     protected BaseApiService(ApiConfig config) {
         this.config = config;
         this.requestSpec = createRequestSpecification();
-        logger.info("Инициализирован API сервис с пользовательской конфигурацией: {}", this.getClass().getSimpleName());
+        logger.info("🌐 Инициализирован API сервис с пользовательской конфигурацией: {} [BaseURL: {}]",
+                   this.getClass().getSimpleName(), config.baseUrl());
     }
 
     /**
@@ -60,11 +63,14 @@ public abstract class BaseApiService {
         // Настройка аутентификации
         configureAuthentication(spec);
 
-        // Настройка логирования
+        // Настройка логирования и Allure интеграции
         if (config.loggingEnabled()) {
             spec.filter(new RequestLoggingFilter())
                 .filter(new ResponseLoggingFilter());
         }
+        
+        // Добавляем Allure фильтр для автоматического прикрепления запросов/ответов
+        spec.filter(new AllureRestAssured());
 
         // Настройка таймаутов
         spec.config(RestAssuredConfig.config()
@@ -72,7 +78,8 @@ public abstract class BaseApiService {
                 .setParam("http.connection.timeout", config.apiTimeout() * 1000)
                 .setParam("http.socket.timeout", config.apiTimeout() * 1000)));
 
-        logger.debug("RequestSpecification настроена для базового URL: {}", config.baseUrl());
+        logger.debug("🔧 RequestSpecification настроена для базового URL: {} [ContentType: {}, Accept: {}]",
+                    config.baseUrl(), config.defaultContentType(), config.defaultAccept());
         return spec;
     }
 
@@ -87,7 +94,7 @@ public abstract class BaseApiService {
         // Настройка SSL
         if (!this.config.sslValidationEnabled()) {
             config = config.sslConfig(SSLConfig.sslConfig().relaxedHTTPSValidation());
-            logger.debug("SSL валидация отключена");
+            logger.debug("🔒 SSL валидация отключена");
         }
 
         return config;
@@ -105,14 +112,14 @@ public abstract class BaseApiService {
             case "basic":
                 if (!config.authUsername().isEmpty() && !config.authPassword().isEmpty()) {
                     spec.auth().basic(config.authUsername(), config.authPassword());
-                    logger.debug("Настроена базовая аутентификация для пользователя: {}", config.authUsername());
+                    logger.debug("🔐 Настроена базовая аутентификация для пользователя: {}", config.authUsername());
                 }
                 break;
                 
             case "bearer":
                 if (!config.bearerToken().isEmpty()) {
                     spec.header("Authorization", "Bearer " + config.bearerToken());
-                    logger.debug("Настроена Bearer аутентификация");
+                    logger.debug("🔐 Настроена Bearer аутентификация");
                 }
                 break;
                 
@@ -120,13 +127,13 @@ public abstract class BaseApiService {
                 // OAuth2 токен должен быть получен отдельно и передан как Bearer
                 if (!config.bearerToken().isEmpty()) {
                     spec.header("Authorization", "Bearer " + config.bearerToken());
-                    logger.debug("Настроена OAuth2 аутентификация");
+                    logger.debug("🔐 Настроена OAuth2 аутентификация");
                 }
                 break;
                 
             case "none":
             default:
-                logger.debug("Аутентификация не настроена");
+                logger.debug("🔐 Аутентификация не настроена");
                 break;
         }
     }
@@ -173,15 +180,19 @@ public abstract class BaseApiService {
         
         while (attempts < maxAttempts) {
             try {
-                return requestAction.get();
+                T result = requestAction.get();
+                if (attempts > 0) {
+                    logger.info("✅ Запрос успешно выполнен с попытки {}", attempts + 1);
+                }
+                return result;
             } catch (Exception e) {
                 attempts++;
                 if (attempts >= maxAttempts) {
-                    logger.error("Запрос не удался после {} попыток", maxAttempts, e);
+                    logger.error("❌ Запрос не удался после {} попыток: {}", maxAttempts, e.getMessage(), e);
                     throw e;
                 }
                 
-                logger.warn("Попытка {} не удалась, повтор через {} мс", attempts, delay, e);
+                logger.warn("⚠️ Попытка {} не удалась, повтор через {} мс: {}", attempts, delay, e.getMessage());
                 try {
                     Thread.sleep(delay);
                 } catch (InterruptedException ie) {
