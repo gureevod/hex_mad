@@ -24,6 +24,12 @@
             <artifactId>hex-core</artifactId>
         </dependency>
 
+        <!-- Configuration -->
+        <dependency>
+            <groupId>org.aeonbits.owner</groupId>
+            <artifactId>owner</artifactId>
+        </dependency>
+
         <!-- UI Testing -->
         <dependency>
             <groupId>com.codeborne</groupId>

@@ -24,6 +24,12 @@
             <artifactId>hex-core</artifactId>
         </dependency>
 
+        <!-- Configuration -->
+        <dependency>
+            <groupId>org.aeonbits.owner</groupId>
+            <artifactId>owner</artifactId>
+        </dependency>
+
         <!-- API Testing -->
         <dependency>
             <groupId>io.rest-assured</groupId>
