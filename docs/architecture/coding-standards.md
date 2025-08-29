@@ -22,7 +22,7 @@ These standards are mandatory for all contributions to the `hex-core-*` modules 
 ### Critical Rules
 - **Immutability:** Prefer immutable objects where possible, especially for DTOs and configuration objects. Use `final` fields and Lombok's `@Value` annotation.
 - **No `System.out.println()`:** All logging must go through the SLF4J facade. Any use of `System.out` or `System.err` is a build failure.
-- **Dependency Injection:** Do not use `new` to instantiate services, drivers, or PageObjects within tests. They must be supplied by Google Guice injection or configured providers.
+- **Instantiation:** Use designated factories (e.g., `ApiServiceFactory`) or direct instantiation (`new PageObject()`) where appropriate. Avoid complex object creation logic within test methods.
 - **Direct Library Usage:** Avoid using RestAssured or Selenide APIs directly within test methods. All interactions must go through the provided `ApiService` or `PageObject`/`Component` abstractions.
 - **Optional Usage:** Use `java.util.Optional` correctly. Do not call `.get()` without an `.isPresent()` check; prefer methods like `orElse()`, `orElseThrow()`, or `ifPresent()`.
 - **Javadoc:** All public classes and methods in the `hex-core-*` modules must have clear Javadoc documentation in Russian, as per NFR11.
