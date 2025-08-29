@@ -2,6 +2,15 @@
 
 These standards are mandatory for all contributions to the `hex-core-*` modules to ensure code quality, consistency, and maintainability. Consuming projects (`hex-project-*`) are strongly encouraged to adopt them.
 
+### Guiding Principles
+Our development philosophy is guided by a pragmatic balance of several core principles:
+
+-   **You apply DRY (Don't Repeat Yourself)** to avoid code duplication.
+-   **You use YAGNI (You Ain't Gonna Need It)** to stop yourself from adding unneeded complexity while trying to be DRY.
+-   **You follow KISS (Keep It Simple, Stupid)** to ensure that the solutions you do build are clear and understandable.
+-   **The SOLID principles** provide more formal, object-oriented guidelines to achieve all of the above in a maintainable architecture.
+-   **SoC (Separation of Concerns)** is the high-level strategy for organizing your code to make following the other principles possible.
+
 ### Core Standards
 - **Languages & Runtimes:** Java 17. Code must be compatible with this version.
 - **Style & Linting:** Google Java Style Guide will be the standard. A Checkstyle configuration file will be provided and integrated into the Maven build, failing the build on violations.

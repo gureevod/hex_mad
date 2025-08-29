@@ -18,7 +18,7 @@ As a test developer,
 I want Owner-backed configuration and a simple factory pattern,
 so that object creation is clear and type-safe with minimal overhead.
 **Acceptance Criteria:**
-1. Owner interfaces support environment profiles (local, CI) and immutable per-thread snapshots.
+1. Owner interfaces support environment profiles (local, CI).
 2. Factory classes are documented with clear creation methods; no static mutable singletons.
 3. Example instantiation for API client and UI driver/session via factory methods.
 
