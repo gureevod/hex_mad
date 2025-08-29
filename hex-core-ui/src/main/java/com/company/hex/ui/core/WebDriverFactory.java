@@ -4,7 +4,6 @@ import com.company.hex.core.config.HexConfigException;
 import com.company.hex.core.config.HexConfigFactory;
 import com.company.hex.ui.config.UiConfig;
 import com.codeborne.selenide.Configuration;
-import com.codeborne.selenide.WebDriverRunner;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
