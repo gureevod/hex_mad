@@ -33,9 +33,7 @@
         <javafaker.version>1.0.2</javafaker.version>
         <jsonschema2pojo.version>1.2.1</jsonschema2pojo.version>
         <assertj.version>3.25.3</assertj.version>
-        <mockito.version>5.12.0</mockito.version>
-        <guice.version>7.0.0</guice.version>
-        
+        <mockito.version>5.12.0</mockito.version>        
         <!-- Plugin Versions -->
         <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
         <maven.surefire.plugin.version>3.1.2</maven.surefire.plugin.version>
@@ -139,13 +137,6 @@
                 <groupId>org.aeonbits.owner</groupId>
                 <artifactId>owner</artifactId>
                 <version>${owner.version}</version>
-            </dependency>
-
-            <!-- Dependency Injection -->
-            <dependency>
-                <groupId>com.google.inject</groupId>
-                <artifactId>guice</artifactId>
-                <version>${guice.version}</version>
             </dependency>
 
             <!-- Logging -->
