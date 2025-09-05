@@ -42,13 +42,3 @@ so that suites scale reliably with low flake rates.
 3. API request/response builders scoped to test thread.
 4. Sample parallel run passes consistently on headless Chromium.
 
-**Story 1.5: First Working Samples (API + UI)**
-As a new adopter,
-I want minimal API and UI sample tests,
-so that I can verify setup and reporting end-to-end quickly.
-**Acceptance Criteria:**
-1. API sample test hits a public mock or stub using RestAssured; Allure steps present.
-2. UI sample test interacts with a simple demo page (input + button); Allure steps present.
-3. Both samples runnable locally and in CI; artifacts archived; Allure report published.
-4. Time-to-first-test path documented (≤ 60 minutes) in Russian.
-
