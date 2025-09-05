@@ -33,7 +33,8 @@
         <javafaker.version>1.0.2</javafaker.version>
         <jsonschema2pojo.version>1.2.1</jsonschema2pojo.version>
         <assertj.version>3.25.3</assertj.version>
-        <mockito.version>5.12.0</mockito.version>        
+        <mockito.version>5.12.0</mockito.version>
+        <aspectj.version>1.9.22</aspectj.version>
         <!-- Plugin Versions -->
         <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
         <maven.surefire.plugin.version>3.1.2</maven.surefire.plugin.version>
@@ -130,6 +131,13 @@
                 <groupId>io.qameta.allure</groupId>
                 <artifactId>allure-rest-assured</artifactId>
                 <version>${allure.version}</version>
+            </dependency>
+
+            <!-- AspectJ for Allure -->
+            <dependency>
+                <groupId>org.aspectj</groupId>
+                <artifactId>aspectjweaver</artifactId>
+                <version>${aspectj.version}</version>
             </dependency>
 
             <!-- Configuration -->
