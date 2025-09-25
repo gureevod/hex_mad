@@ -5,34 +5,35 @@ This document outlines the implementation plan for introducing a declarative API
 
 ## Architecture Overview
 
-### Clean Slate Approach
-Since the existing hex-core-api implementation was just a dummy example, we're replacing it entirely with a modern, modular architecture.
+### Pure Declarative Approach for MVP
+Since the existing hex-core-api implementation was just a dummy example, we're replacing it entirely with a clean, declarative-first architecture.
 
 ### New Modular Design
-- **Declarative First**: Primary approach using annotated interfaces (Retrofit2-style)
-- **Imperative Fallback**: Direct RestAssured access when needed for complex scenarios
+- **Declarative Only**: Clean annotated interfaces (Retrofit2-style) for MVP
 - **Modular Components**: Single responsibility modules that can be extended/replaced
+- **Future Extensibility**: Architecture supports adding imperative support later via interceptors if needed
 
 ## Implementation Phases
 
-### Phase 1: Core Infrastructure (Week 1-2)
-**Goal**: Establish foundation for declarative API support
+### Phase 1: Core Declarative Framework (Week 1-2)
+**Goal**: Establish pure declarative API foundation
 
 **Deliverables**:
-1. Annotation classes in `com.company.hex.api.annotations`
+1. Annotation system in `com.company.hex.api.annotations`
    - HTTP methods: `@GET`, `@POST`, `@PUT`, `@DELETE`, `@PATCH`
    - Parameters: `@Path`, `@Query`, `@Body`, `@Header`, `@FormParam`
-   - Configuration: `@ApiService`, `@Headers`, `@Retry`
+   - Configuration: `@ApiService`, `@Headers`, `@Retry`, `@ExpectedStatus`
 
-2. Dynamic proxy implementation
-   - `DeclarativeApiProxy` class with `InvocationHandler`
-   - Request building from method annotations
-   - Response conversion to return types
+2. Modular component architecture
+   - `AnnotationProcessor` for parsing method annotations
+   - `RequestExecutor` for HTTP execution via RestAssured
+   - `ResponseConverter` for type-safe response conversion
+   - `InterceptorChain` for cross-cutting concerns
 
-3. Enhanced `ApiServiceFactory`
-   - New `createDeclarative()` methods
-   - Support for interface-based services
-   - Maintain existing `create()` methods
+3. Clean `ApiServiceFactory`
+   - Simple `create(Class<T> serviceInterface)` method
+   - Builder pattern for custom configuration
+   - No legacy methods - clean slate approach
 
 **Modular Structure**:
 ```
@@ -69,28 +70,35 @@ hex-core-api/
 │       └── ApiConfig.java
 ```
 
-### Phase 2: Sample Implementations (Week 2-3)
-**Goal**: Demonstrate both approaches with real examples
+### Phase 2: Sample Implementation (Week 2-3)
+**Goal**: Demonstrate declarative approach with real examples
 
 **Deliverables**:
-1. Declarative interface example
+1. Complete declarative interface example
    ```java
-   @ApiService(basePath = "/api")
-   public interface UserApiDeclarative {
+   @ApiService(baseUrl = "${api.base.url}")
+   public interface UserApi {
        @GET("/users/{id}")
        UserDto getUserById(@Path("id") int userId);
+       
+       @POST("/users")
+       @Headers("Content-Type: application/json")
+       UserDto createUser(@Body CreateUserRequest request);
    }
    ```
 
-2. Hybrid service example
+2. DTO examples with Lombok and Jackson
    ```java
-   public class UserApiHybrid extends BaseApiService implements UserApiDeclarative {
-       // Declarative methods auto-implemented
-       // Complex custom methods added here
+   @Value
+   @Builder
+   public class UserDto {
+       int id;
+       String name;
+       String email;
    }
    ```
 
-3. Test examples for both approaches
+3. Test examples showing declarative usage
 
 **Files to Create/Update**:
 ```
@@ -106,15 +114,15 @@ hex-project-samples/
 │       └── UpdateUserRequest.java
 ```
 
-### Phase 3: Advanced Features (Week 3-4)
-**Goal**: Add enterprise-grade features
+### Phase 3: Advanced Declarative Features (Week 3-4)
+**Goal**: Add enterprise-grade declarative features
 
 **Deliverables**:
-1. Method-level retry configuration via `@Retry`
-2. Custom timeout support via `@Timeout`
-3. Form and multipart support
-4. Response validation annotations
-5. Error handling patterns
+1. Advanced annotations: `@Retry`, `@Timeout`, `@ExpectedStatus`
+2. Form and multipart support: `@FormUrlEncoded`, `@Multipart`
+3. Authentication interceptors for Bearer tokens, API keys
+4. Error handling with typed exceptions
+5. Interceptor system for extensibility
 
 ### Phase 4: Documentation & Migration (Week 4-5)
 **Goal**: Enable smooth adoption
@@ -259,22 +267,23 @@ Each module has one clear purpose:
 
 ## Decision Guidelines
 
-### When to Use Declarative
-- ✅ Simple CRUD operations
-- ✅ Standard REST endpoints
+### When to Use Declarative (MVP Focus)
+- ✅ All standard REST operations (CRUD)
 - ✅ Type-safe responses needed
-- ✅ Minimal request customization
+- ✅ Clean, maintainable API contracts
+- ✅ Standard authentication patterns
+- ✅ Most common testing scenarios
 
-### When to Use Imperative (RestAssured)
-- ✅ Complex request building
-- ✅ Dynamic parameters
-- ✅ Custom filters/interceptors
-- ✅ Non-standard protocols
+### When to Extend with Interceptors
+- ✅ Complex request transformation
+- ✅ Custom authentication flows
+- ✅ Non-standard protocols (GraphQL, etc.)
+- ✅ Advanced caching or circuit breaker patterns
 
-### When to Use Hybrid
-- ✅ Mix of simple and complex operations
-- ✅ Gradual migration scenarios
-- ✅ Need both type safety and flexibility
+### Future: When to Add Imperative Support
+- ⏳ If declarative + interceptors prove insufficient
+- ⏳ For highly dynamic request building
+- ⏳ When direct RestAssured access is absolutely needed
 
 ## Timeline Summary
 
@@ -287,11 +296,11 @@ Each module has one clear purpose:
 
 ## Conclusion
 
-This implementation plan provides a pragmatic path to introducing declarative API testing while maintaining the framework's core principles:
-- **KISS**: Simple annotations for simple cases
-- **YAGNI**: Start with runtime proxy, defer compile-time processing
-- **DRY**: Reuse existing BaseApiService infrastructure
-- **Backward Compatible**: Zero breaking changes
-- **Flexible**: Three approaches to match complexity
+This implementation plan provides a clean, focused path to declarative API testing:
+- **KISS**: Pure declarative approach for MVP - no hybrid complexity
+- **YAGNI**: Start with essential features, add complexity only when needed
+- **DRY**: Modular components prevent code duplication
+- **Clean Slate**: No legacy baggage from dummy implementation
+- **Extensible**: Interceptor system allows future enhancements
 
-The hybrid approach ensures teams can adopt the declarative pattern at their own pace while maintaining full access to RestAssured's power when needed.
+The pure declarative approach ensures developers get a clean, type-safe API testing experience while maintaining the flexibility to extend via interceptors when needed.

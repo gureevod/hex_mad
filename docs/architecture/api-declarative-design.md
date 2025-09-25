@@ -5,28 +5,29 @@ This document outlines the architectural design for incorporating a declarative 
 
 ## Design Goals
 1. **Developer Productivity**: Enable developers to define API contracts using simple Java interfaces with annotations
-2. **Flexibility**: Support both declarative and imperative approaches based on use case complexity
-3. **Type Safety**: Leverage compile-time checking for API contracts and DTOs
-4. **Modularity**: Highly modular design with single responsibility components
-5. **Extensibility**: Easy to extend with custom interceptors, converters, and handlers
-6. **Testability**: Maintain the same level of logging, reporting, and retry capabilities
+2. **Type Safety**: Leverage compile-time checking for API contracts and DTOs
+3. **Modularity**: Highly modular design with single responsibility components
+4. **Extensibility**: Easy to extend with custom interceptors, converters, and handlers
+5. **Simplicity**: Pure declarative approach for MVP - imperative support can be added later if needed
+6. **Testability**: Maintain excellent logging, reporting, and retry capabilities
 
 ## Architecture Overview
 
-### Hybrid Approach
-The framework will support three levels of API interaction:
+### Pure Declarative Approach
+The framework provides a clean, annotation-driven API testing experience:
 
 ```mermaid
 graph TD
-    subgraph "API Testing Approaches"
-        A[Declarative Interface] -->|Simple APIs| B[Annotation Processor]
-        C[Extended Service] -->|Medium Complexity| D[BaseApiService]
-        E[Direct RestAssured] -->|Complex Scenarios| F[BaseApiService.newRequest]
-        
-        B --> G[Dynamic Proxy]
-        G --> D
-        D --> H[RestAssured]
-        F --> H
+    subgraph "Declarative API Flow"
+        A[Annotated Interface] --> B[ProxyHandler]
+        B --> C[AnnotationProcessor]
+        C --> D[RequestDefinition]
+        D --> E[InterceptorChain]
+        E --> F[RequestExecutor]
+        F --> G[RestAssured]
+        G --> H[Response]
+        H --> I[ResponseConverter]
+        I --> J[Typed Result]
     end
 ```
 
@@ -167,52 +168,39 @@ public interface UserApiDeclarative {
 }
 ```
 
-### 2. Mixed Approach - Extending Declarative Service
+### 2. Pure Declarative Service Example
 ```java
 package com.company.hex.project.api.services;
 
-import com.company.hex.api.service.BaseApiService;
-import io.restassured.response.Response;
-
-public class UserApiHybrid extends BaseApiService implements UserApiDeclarative {
+@ApiService(baseUrl = "${api.base.url}")
+public interface UserApi {
     
-    // Declarative methods are auto-implemented via proxy
-    // Complex custom methods can be added here
+    @GET("/users")
+    List<UserDto> getAllUsers();
     
-    public Response batchUpdateUsers(List<Integer> userIds, Map<String, Object> updates) {
-        // Complex logic that's easier with imperative approach
-        return executeWithRetry(() -> {
-            var request = newRequest()
-                .body(Map.of(
-                    "userIds", userIds,
-                    "updates", updates,
-                    "timestamp", System.currentTimeMillis()
-                ));
-            
-            // Custom validation logic
-            if (userIds.size() > 100) {
-                request.header("X-Batch-Mode", "large");
-            }
-            
-            return request
-                .when()
-                .patch("/users/batch")
-                .then()
-                .extract()
-                .response();
-        });
-    }
+    @GET("/users/{id}")
+    UserDto getUserById(@Path("id") int userId);
     
-    public Response complexGraphQLQuery(String query, Map<String, Object> variables) {
-        // GraphQL or other complex scenarios
-        return newRequest()
-            .body(Map.of("query", query, "variables", variables))
-            .when()
-            .post("/graphql")
-            .then()
-            .extract()
-            .response();
-    }
+    @GET("/users/search")
+    List<UserDto> searchUsers(@Query("name") String name,
+                              @Query("age") Integer age);
+    
+    @POST("/users")
+    @Headers("Content-Type: application/json")
+    UserDto createUser(@Body CreateUserRequest request);
+    
+    @PUT("/users/{id}")
+    @Retry(count = 3, delay = 1000)
+    UserDto updateUser(@Path("id") int userId,
+                       @Body UpdateUserRequest request);
+    
+    @DELETE("/users/{id}")
+    @ExpectedStatus(204)
+    void deleteUser(@Path("id") int userId);
+    
+    @POST("/users/batch")
+    @Headers("X-Batch-Operation: true")
+    BatchResult batchUpdateUsers(@Body BatchUpdateRequest request);
 }
 ```
 
@@ -370,65 +358,69 @@ public void testDeclarativeApi() {
 }
 ```
 
-### Example 2: Hybrid Approach
+### Example 2: Advanced Declarative Features
 ```java
 @Test
-public void testHybridApi() {
-    // Create hybrid service
-    UserApiHybrid userApi = ApiServiceFactory.create(UserApiHybrid.class);
+public void testAdvancedDeclarativeFeatures() {
+    UserApi userApi = ApiServiceFactory.create(UserApi.class);
     
-    // Use declarative methods
+    // Type-safe API calls with automatic retry
     UserDto user = userApi.getUserById(123);
+    assertThat(user.getName()).isNotEmpty();
     
-    // Use complex custom methods
-    Response batchResponse = userApi.batchUpdateUsers(
-        List.of(1, 2, 3),
-        Map.of("status", "active")
+    // Batch operations with custom headers
+    BatchResult result = userApi.batchUpdateUsers(
+        BatchUpdateRequest.builder()
+            .userIds(List.of(1, 2, 3))
+            .updates(Map.of("status", "active"))
+            .build()
     );
     
-    assertThat(batchResponse.statusCode()).isEqualTo(200);
+    assertThat(result.getSuccessCount()).isEqualTo(3);
 }
 ```
 
-### Example 3: Fallback to RestAssured
+### Example 3: Custom Interceptors for Complex Logic
 ```java
-public class ComplexApiService extends BaseApiService {
-    
-    public Response performComplexOperation() {
-        // Direct RestAssured usage for complex scenarios
-        return newRequest()
-            .filter((requestSpec, responseSpec, ctx) -> {
-                // Custom filter logic
-                requestSpec.header("X-Custom", calculateCustomHeader());
-                return ctx.next(requestSpec, responseSpec);
-            })
-            .multiPart("file", new File("data.json"))
-            .formParam("metadata", generateMetadata())
-            .when()
-            .post("/complex/operation")
-            .then()
-            .extract()
-            .response();
+// For complex scenarios, use custom interceptors
+public class GraphQLInterceptor implements Interceptor {
+    @Override
+    public Response intercept(Chain chain) {
+        RequestDefinition request = chain.request();
+        
+        // Transform REST call to GraphQL
+        if (request.getPath().startsWith("/graphql")) {
+            // Custom GraphQL logic
+            return executeGraphQLQuery(request);
+        }
+        
+        return chain.proceed(request);
     }
 }
+
+// Register interceptor
+ApiServiceFactory.builder()
+    .addInterceptor(new GraphQLInterceptor())
+    .build()
+    .create(UserApi.class);
 ```
 
 ## Implementation Strategy
 
-### Phase 1: Core Modules
-1. Implement modular components (processor, executor, converter)
-2. Create extensible interceptor chain
-3. Build flexible factory with builder pattern
+### Phase 1: Core Declarative Framework
+1. Implement annotation system and processor
+2. Create dynamic proxy with modular components
+3. Build service factory with clean API
 
-### Phase 2: Integration
-1. Replace existing `BaseApiService` with new modular design
-2. Implement declarative interface support
-3. Add RestAssured fallback for complex scenarios
+### Phase 2: Essential Features
+1. Type-safe response conversion
+2. Retry and error handling
+3. Logging and Allure integration
 
-### Phase 3: Extensions
-1. Custom interceptors (auth, logging, metrics)
-2. Additional converters (XML, Protobuf)
-3. Advanced error handling strategies
+### Phase 3: Advanced Declarative Features
+1. Custom interceptors for complex scenarios
+2. Additional converters (XML, custom formats)
+3. Advanced validation and error handling
 
 ## Benefits
 

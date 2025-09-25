@@ -1,134 +1,134 @@
 # Epic 2: API Layer Patterns and Examples
-**Epic Goal:** Standardize API models/services with both declarative (Retrofit2-style) and imperative (RestAssured) approaches, providing pragmatic examples so teams can adopt Hex's API layer independently and incrementally.
+**Epic Goal:** Standardize API models/services with a clean declarative (Retrofit2-style) approach, providing pragmatic examples so teams can adopt Hex's API layer independently and incrementally.
 
-## Story 2.1: Declarative API Interface Pattern
+## Story 2.1: Core Declarative API Framework
 **As an API test developer,**
 **I want a declarative interface pattern similar to Retrofit2,**
 **so that I can define API contracts with minimal boilerplate code.**
 
 **Acceptance Criteria:**
 1. Core annotations (`@GET`, `@POST`, `@PUT`, `@DELETE`, `@Path`, `@Query`, `@Body`, `@Header`) are implemented in `hex-core-api`.
-2. `ApiServiceFactory.createDeclarative()` creates proxy implementations from annotated interfaces.
-3. Return types support both `Response` and typed DTOs with automatic deserialization.
+2. `ApiServiceFactory.create()` creates proxy implementations from annotated interfaces.
+3. Return types support typed DTOs with automatic JSON deserialization.
 4. Sample interface demonstrates CRUD operations with type-safe DTOs.
 5. Allure reporting and logging work transparently with declarative calls.
 
-## Story 2.2: Hybrid Service Pattern (Declarative + Imperative)
-**As an API test developer,**
-**I want to combine declarative and imperative approaches in a single service,**
-**so that I can handle both simple and complex API scenarios efficiently.**
+## Story 2.2: Modular Component Architecture
+**As a framework developer,**
+**I want a modular component architecture for the API layer,**
+**so that components can be easily extended and customized.**
 
 **Acceptance Criteria:**
-1. Services can implement declarative interfaces while extending `BaseApiService`.
-2. Declarative methods are auto-implemented via proxy delegation.
-3. Complex custom methods can use `newRequest()` for full RestAssured control.
-4. Example shows batch operations, GraphQL, or complex request building.
-5. Both approaches share the same configuration, retry logic, and logging.
+1. Separate modules for annotation processing, request execution, and response conversion.
+2. Interceptor chain pattern for cross-cutting concerns (auth, logging, retry).
+3. Each component has single responsibility and clear interfaces.
+4. Components can be extended or replaced without affecting others.
+5. Factory uses builder pattern for flexible configuration.
 
-## Story 2.3: DTOs and Service Base Pattern
+## Story 2.3: DTOs and Type-Safe Responses
 **As an API test developer,**
-**I want standardized DTO patterns and service base classes,**
-**so that requests/responses are consistent across declarative and imperative approaches.**
+**I want standardized DTO patterns with type-safe responses,**
+**so that API contracts are enforced at compile time.**
 
 **Acceptance Criteria:**
-1. `hex-core-api` exposes `BaseApiService` with RestAssured setup and helpers.
-2. DTO examples use Lombok (`@Value`, `@Builder`, `@With`) and Jackson annotations.
-3. DTOs work seamlessly with both declarative return types and RestAssured `.as(Class)`.
-4. Error model and exception mapping patterns documented for both approaches.
-5. Samples include GET/POST with typed responses in both styles.
+1. DTO examples use Lombok (`@Value`, `@Builder`, `@With`) and Jackson annotations.
+2. Declarative interfaces return typed DTOs with automatic JSON deserialization.
+3. Error model and exception mapping patterns documented.
+4. Generic support for `List<T>`, `Optional<T>`, and custom wrapper types.
+5. Samples include GET/POST with typed responses and error handling.
 
-## Story 2.4: Contract Validation Examples
+## Story 2.4: Contract Validation and Error Handling
 **As a QA engineer,**
-**I want schema/contract validation that works with both API approaches,**
-**so that API behavior can be verified against contracts regardless of implementation style.**
+**I want schema/contract validation integrated with declarative APIs,**
+**so that API behavior can be verified against contracts automatically.**
 
 **Acceptance Criteria:**
-1. JSON schema validation works with declarative interface responses.
-2. RestAssured filter chain integrates with proxy-based calls.
-3. Contract validation can be applied via `@Validated` annotation or filters.
-4. Allure steps capture validation for both declarative and imperative calls.
-5. Negative test examples for both approaches with clear failure messaging.
+1. `@ExpectedStatus` annotation for HTTP status validation.
+2. JSON schema validation via interceptors or annotations.
+3. Custom error handling with typed exception mapping.
+4. Allure steps capture validation results automatically.
+5. Negative test examples with clear failure messaging.
 
-## Story 2.5: Configurable Authentication Patterns
+## Story 2.5: Authentication and Security Patterns
 **As a test developer,**
-**I want authentication that works transparently with both API styles,**
+**I want authentication that works seamlessly with declarative APIs,**
 **so that services authenticate consistently across environments.**
 
 **Acceptance Criteria:**
-1. Authentication configured once in `ApiConfig` applies to both approaches.
-2. `@Headers` annotation supports static auth headers in declarative interfaces.
-3. Dynamic token providers work with proxy-based calls.
-4. Bearer token injection via interceptors for declarative services.
-5. Examples show OAuth2, API keys, and basic auth in both styles.
+1. `@Headers` annotation supports static auth headers.
+2. Dynamic authentication via interceptors (Bearer tokens, API keys).
+3. OAuth2 flow support with token refresh capabilities.
+4. Per-service and per-method authentication configuration.
+5. Examples show different auth patterns with declarative interfaces.
 
 ## Story 2.6: Advanced Declarative Features
 **As a framework user,**
 **I want advanced declarative features for common patterns,**
-**so that I can handle retries, timeouts, and caching declaratively.**
+**so that I can handle complex scenarios without custom code.**
 
 **Acceptance Criteria:**
-1. `@Retry(count=5, delay=2000)` annotation for method-level retry configuration.
+1. `@Retry(count=3, delay=1000)` annotation for method-level retry configuration.
 2. `@Timeout(seconds=30)` for custom timeout per endpoint.
-3. `@Cache(duration=60)` for response caching (optional, future enhancement).
-4. `@FormUrlEncoded` and `@Multipart` for different content types.
+3. `@FormUrlEncoded` and `@Multipart` for different content types.
+4. `@Headers` for static and dynamic header configuration.
 5. Examples show file upload, form submission, and retry scenarios.
 
-## Story 2.7: Service Test Scaffolds and Data Providers
+## Story 2.7: Extensible Interceptor System
+**As a framework user,**
+**I want to add custom logic via interceptors,**
+**so that I can handle complex scenarios that aren't covered by annotations.**
+
+**Acceptance Criteria:**
+1. Interceptor interface for request/response modification.
+2. Chain pattern allows multiple interceptors in sequence.
+3. Built-in interceptors for logging, auth, retry, and metrics.
+4. Custom interceptor examples for GraphQL, caching, and transformation.
+5. Interceptors can be configured per service or globally.
+
+## Story 2.8: Test Scaffolds and Data Generation
 **As a developer,**
-**I want test scaffolds that work with both API styles,**
-**so that I can write robust tests quickly regardless of approach.**
+**I want test scaffolds optimized for declarative APIs,**
+**so that I can write robust tests quickly.**
 
 **Acceptance Criteria:**
-1. Base test class supports both `ApiServiceFactory.create()` and `.createDeclarative()`.
-2. JavaFaker utilities generate data for both DTO objects and Map<String, Object>.
-3. Test examples show declarative interfaces with typed DTOs.
-4. Test examples show imperative approach for complex scenarios.
-5. Parallel-safe service creation for both patterns documented.
+1. Base test class with declarative service creation helpers.
+2. JavaFaker utilities generate data for DTO objects.
+3. Test examples show declarative interfaces with realistic data.
+4. Parallel-safe service creation patterns documented.
+5. Integration with existing Hex testing infrastructure.
 
-## Story 2.8: Error Handling and Response Validation
-**As a framework maintainer,**
-**I want consistent error handling across both API approaches,**
-**so that failures are reported uniformly.**
-
-**Acceptance Criteria:**
-1. Declarative methods throw consistent exceptions for HTTP errors.
-2. Response validation works via return type (exception on type mismatch).
-3. `@ExpectedStatus(200)` annotation for declarative status validation.
-4. Error translation patterns work for both approaches.
-5. Examples show error assertions in both declarative and imperative styles.
-
-## Story 2.9: DTO Generation Workflow
+## Story 2.9: DTO Generation from OpenAPI/JSON Schema
 **As a new adopter,**
-**I want to generate DTOs that work with both API approaches,**
-**so that I can quickly create models for service responses.**
+**I want to generate DTOs from API specifications,**
+**so that I can quickly create type-safe models.**
 
 **Acceptance Criteria:**
 1. Maven plugin configuration for jsonschema2pojo with Lombok integration.
-2. Generated DTOs include Jackson annotations for JSON mapping.
-3. DTOs work as return types in declarative interfaces.
-4. DTOs work with RestAssured's `.as(DtoClass.class)` method.
-5. Example workflow: JSON → DTO → use in both declarative and imperative tests.
+2. Generated DTOs work seamlessly with declarative interfaces.
+3. OpenAPI 3.0 support for comprehensive DTO generation.
+4. Example workflow: OpenAPI spec → DTOs → declarative interface.
+5. Generated code follows Hex framework conventions.
 
-## Story 2.10: Migration Guide from Pure RestAssured
-**As a team with existing RestAssured tests,**
-**I want a clear migration path to the declarative approach,**
-**so that we can adopt it incrementally without breaking existing tests.**
+## Story 2.10: Performance and Monitoring
+**As a framework maintainer,**
+**I want performance monitoring and optimization for declarative APIs,**
+**so that the framework scales well in enterprise environments.**
 
 **Acceptance Criteria:**
-1. Step-by-step guide for extracting interfaces from existing services.
-2. Examples of converting RestAssured chains to declarative methods.
-3. Backward compatibility confirmed - existing tests continue working.
-4. Performance comparison showing minimal overhead.
-5. Decision matrix: when to use declarative vs. imperative vs. hybrid.
+1. Minimal reflection overhead with method metadata caching.
+2. Built-in metrics collection for request timing and success rates.
+3. Memory-efficient proxy implementation.
+4. Performance benchmarks vs. direct RestAssured usage.
+5. Monitoring integration with existing observability tools.
 
 ## Implementation Priority
-1. **Phase 1 (Core):** Stories 2.1, 2.3, 2.9 - Basic declarative support with DTOs
-2. **Phase 2 (Integration):** Stories 2.2, 2.5, 2.7 - Hybrid approach and auth
-3. **Phase 3 (Advanced):** Stories 2.4, 2.6, 2.8 - Validation and advanced features
-4. **Phase 4 (Adoption):** Story 2.10 - Migration guide and best practices
+1. **Phase 1 (Foundation):** Stories 2.1, 2.2, 2.3 - Core declarative framework with modular architecture
+2. **Phase 2 (Features):** Stories 2.4, 2.5, 2.6 - Validation, auth, and advanced declarative features
+3. **Phase 3 (Extensions):** Stories 2.7, 2.8, 2.9 - Interceptors, testing, and DTO generation
+4. **Phase 4 (Optimization):** Story 2.10 - Performance monitoring and enterprise readiness
 
 ## Technical Notes
-- The declarative approach uses Java dynamic proxies (no compile-time processing initially)
-- Full RestAssured access remains available via `BaseApiService.newRequest()`
-- All existing `BaseApiService` features (retry, logging, config) work with both approaches
-- Teams can mix approaches within the same project or even the same service class
+- Pure declarative approach using Java dynamic proxies for MVP
+- Modular architecture allows easy extension without breaking changes
+- Imperative support can be added later via interceptor system if needed
+- Focus on developer experience and type safety over feature completeness
