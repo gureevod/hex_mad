@@ -1,9 +1,14 @@
 package com.company.hex.api.processor;
 
 import com.company.hex.api.annotations.config.ApiService;
+import com.company.hex.api.annotations.http.DELETE;
 import com.company.hex.api.annotations.http.GET;
+import com.company.hex.api.annotations.http.PATCH;
 import com.company.hex.api.annotations.http.POST;
+import com.company.hex.api.annotations.http.PUT;
 import com.company.hex.api.annotations.param.Body;
+import com.company.hex.api.annotations.param.FormParam;
+import com.company.hex.api.annotations.param.Header;
 import com.company.hex.api.annotations.param.Path;
 import com.company.hex.api.annotations.param.Query;
 import com.company.hex.api.model.RequestDefinition;
@@ -37,6 +42,9 @@ public class AnnotationProcessor {
         logger.debug("Processing method: {}.{}", serviceClass.getSimpleName(), method.getName());
         
         RequestDefinition.Builder builder = RequestDefinition.builder();
+        
+        // Store the method reference for annotation access
+        builder.method(method);
         
         // Extract service-level configuration
         processServiceAnnotation(serviceClass, builder);
@@ -76,7 +84,7 @@ public class AnnotationProcessor {
     }
     
     /**
-     * Process HTTP method annotations (@GET, @POST, etc.).
+     * Process HTTP method annotations (@GET, @POST, @PUT, @DELETE, @PATCH).
      */
     private void processHttpMethodAnnotation(Method method, RequestDefinition.Builder builder) {
         if (method.isAnnotationPresent(GET.class)) {
@@ -89,13 +97,28 @@ public class AnnotationProcessor {
             builder.httpMethod("POST");
             builder.path(post.value());
             logger.debug("HTTP Method: POST, Path: {}", post.value());
+        } else if (method.isAnnotationPresent(PUT.class)) {
+            PUT put = method.getAnnotation(PUT.class);
+            builder.httpMethod("PUT");
+            builder.path(put.value());
+            logger.debug("HTTP Method: PUT, Path: {}", put.value());
+        } else if (method.isAnnotationPresent(DELETE.class)) {
+            DELETE delete = method.getAnnotation(DELETE.class);
+            builder.httpMethod("DELETE");
+            builder.path(delete.value());
+            logger.debug("HTTP Method: DELETE, Path: {}", delete.value());
+        } else if (method.isAnnotationPresent(PATCH.class)) {
+            PATCH patch = method.getAnnotation(PATCH.class);
+            builder.httpMethod("PATCH");
+            builder.path(patch.value());
+            logger.debug("HTTP Method: PATCH, Path: {}", patch.value());
         } else {
-            throw new IllegalStateException("Method " + method.getName() + " must have an HTTP method annotation (@GET, @POST, etc.)");
+            throw new IllegalStateException("Method " + method.getName() + " must have an HTTP method annotation (@GET, @POST, @PUT, @DELETE, @PATCH)");
         }
     }
     
     /**
-     * Process parameter annotations (@Path, @Query, @Body).
+     * Process parameter annotations (@Path, @Query, @Header, @FormParam, @Body).
      */
     private void processParameters(Method method, Object[] args, RequestDefinition.Builder builder) {
         Parameter[] parameters = method.getParameters();
@@ -116,6 +139,14 @@ public class AnnotationProcessor {
                 Query query = parameter.getAnnotation(Query.class);
                 builder.addQueryParam(query.value(), arg);
                 logger.debug("Query param: {} = {}", query.value(), arg);
+            } else if (parameter.isAnnotationPresent(Header.class)) {
+                Header header = parameter.getAnnotation(Header.class);
+                builder.addHeader(header.value(), arg);
+                logger.debug("Header: {} = {}", header.value(), arg);
+            } else if (parameter.isAnnotationPresent(FormParam.class)) {
+                FormParam formParam = parameter.getAnnotation(FormParam.class);
+                builder.addFormParam(formParam.value(), arg);
+                logger.debug("Form param: {} = {}", formParam.value(), arg);
             } else if (parameter.isAnnotationPresent(Body.class)) {
                 builder.body(arg);
                 logger.debug("Request body set: {}", arg != null ? arg.getClass().getSimpleName() : "null");

@@ -5,6 +5,10 @@ import com.company.hex.api.converter.JacksonResponseConverter;
 import com.company.hex.api.converter.ResponseConverter;
 import com.company.hex.api.executor.RequestExecutor;
 import com.company.hex.api.executor.RestAssuredExecutor;
+import com.company.hex.api.interceptor.InterceptorChain;
+import com.company.hex.api.interceptor.LoggingInterceptor;
+import com.company.hex.api.interceptor.RetryInterceptor;
+import com.company.hex.api.interceptor.StatusValidationInterceptor;
 import com.company.hex.api.processor.AnnotationProcessor;
 import com.company.hex.api.proxy.ProxyHandler;
 import com.company.hex.core.config.HexConfigException;
@@ -58,11 +62,20 @@ public final class ApiServiceFactory {
         RequestExecutor requestExecutor = new RestAssuredExecutor();
         ResponseConverter responseConverter = new JacksonResponseConverter();
         
+        // Create interceptor chain with default interceptors
+        // Order matters: Retry -> Logging -> StatusValidation
+        InterceptorChain interceptorChain = new InterceptorChain.Builder()
+            .addInterceptor(new RetryInterceptor())
+            .addInterceptor(new LoggingInterceptor())
+            .addInterceptor(new StatusValidationInterceptor())
+            .requestExecutor(requestExecutor)
+            .build();
+        
         // Create proxy handler
         ProxyHandler handler = new ProxyHandler(
             serviceInterface,
             annotationProcessor,
-            requestExecutor,
+            interceptorChain,
             responseConverter
         );
         
@@ -106,11 +119,20 @@ public final class ApiServiceFactory {
         RequestExecutor requestExecutor = new RestAssuredExecutor(config);
         ResponseConverter responseConverter = new JacksonResponseConverter();
         
+        // Create interceptor chain with default interceptors
+        // Order matters: Retry -> Logging -> StatusValidation
+        InterceptorChain interceptorChain = new InterceptorChain.Builder()
+            .addInterceptor(new RetryInterceptor())
+            .addInterceptor(new LoggingInterceptor())
+            .addInterceptor(new StatusValidationInterceptor())
+            .requestExecutor(requestExecutor)
+            .build();
+        
         // Create proxy handler
         ProxyHandler handler = new ProxyHandler(
             serviceInterface,
             annotationProcessor,
-            requestExecutor,
+            interceptorChain,
             responseConverter
         );
         

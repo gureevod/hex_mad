@@ -1,5 +1,6 @@
 package com.company.hex.api.model;
 
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -16,16 +17,22 @@ public final class RequestDefinition {
     private final String path;
     private final Map<String, Object> pathParams;
     private final Map<String, Object> queryParams;
+    private final Map<String, Object> headers;
+    private final Map<String, Object> formParams;
     private final Object body;
     private final String baseUrl;
+    private final Method method;
     
     private RequestDefinition(Builder builder) {
         this.httpMethod = builder.httpMethod;
         this.path = builder.path;
         this.pathParams = new HashMap<>(builder.pathParams);
         this.queryParams = new HashMap<>(builder.queryParams);
+        this.headers = new HashMap<>(builder.headers);
+        this.formParams = new HashMap<>(builder.formParams);
         this.body = builder.body;
         this.baseUrl = builder.baseUrl;
+        this.method = builder.method;
     }
     
     public String getHttpMethod() {
@@ -44,12 +51,24 @@ public final class RequestDefinition {
         return new HashMap<>(queryParams);
     }
     
+    public Map<String, Object> getHeaders() {
+        return new HashMap<>(headers);
+    }
+    
+    public Map<String, Object> getFormParams() {
+        return new HashMap<>(formParams);
+    }
+    
     public Object getBody() {
         return body;
     }
     
     public String getBaseUrl() {
         return baseUrl;
+    }
+    
+    public Method getMethod() {
+        return method;
     }
     
     public static Builder builder() {
@@ -61,8 +80,11 @@ public final class RequestDefinition {
         private String path;
         private Map<String, Object> pathParams = new HashMap<>();
         private Map<String, Object> queryParams = new HashMap<>();
+        private Map<String, Object> headers = new HashMap<>();
+        private Map<String, Object> formParams = new HashMap<>();
         private Object body;
         private String baseUrl;
+        private Method method;
         
         public Builder httpMethod(String httpMethod) {
             this.httpMethod = httpMethod;
@@ -86,6 +108,20 @@ public final class RequestDefinition {
             return this;
         }
         
+        public Builder addHeader(String name, Object value) {
+            if (value != null) {
+                this.headers.put(name, value);
+            }
+            return this;
+        }
+        
+        public Builder addFormParam(String name, Object value) {
+            if (value != null) {
+                this.formParams.put(name, value);
+            }
+            return this;
+        }
+        
         public Builder body(Object body) {
             this.body = body;
             return this;
@@ -93,6 +129,11 @@ public final class RequestDefinition {
         
         public Builder baseUrl(String baseUrl) {
             this.baseUrl = baseUrl;
+            return this;
+        }
+        
+        public Builder method(Method method) {
+            this.method = method;
             return this;
         }
         
@@ -114,6 +155,8 @@ public final class RequestDefinition {
                 ", path='" + path + '\'' +
                 ", pathParams=" + pathParams +
                 ", queryParams=" + queryParams +
+                ", headers=" + headers +
+                ", formParams=" + formParams +
                 ", hasBody=" + (body != null) +
                 ", baseUrl='" + baseUrl + '\'' +
                 '}';

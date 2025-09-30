@@ -1,7 +1,7 @@
 package com.company.hex.api.proxy;
 
 import com.company.hex.api.converter.ResponseConverter;
-import com.company.hex.api.executor.RequestExecutor;
+import com.company.hex.api.interceptor.InterceptorChain;
 import com.company.hex.api.model.RequestDefinition;
 import com.company.hex.api.processor.AnnotationProcessor;
 import com.company.hex.core.logging.HexLoggerFactory;
@@ -13,8 +13,8 @@ import java.lang.reflect.Method;
 
 /**
  * Dynamic proxy handler that intercepts method calls on API service interfaces.
- * Orchestrates the flow: annotation processing → request execution → response conversion.
- * 
+ * Orchestrates the flow: annotation processing → interceptor chain → request execution → response conversion.
+ *
  * @author Hex Framework
  * @version 1.0
  */
@@ -24,16 +24,16 @@ public class ProxyHandler implements InvocationHandler {
     
     private final Class<?> serviceInterface;
     private final AnnotationProcessor annotationProcessor;
-    private final RequestExecutor requestExecutor;
+    private final InterceptorChain interceptorChain;
     private final ResponseConverter responseConverter;
     
     public ProxyHandler(Class<?> serviceInterface,
                        AnnotationProcessor annotationProcessor,
-                       RequestExecutor requestExecutor,
+                       InterceptorChain interceptorChain,
                        ResponseConverter responseConverter) {
         this.serviceInterface = serviceInterface;
         this.annotationProcessor = annotationProcessor;
-        this.requestExecutor = requestExecutor;
+        this.interceptorChain = interceptorChain;
         this.responseConverter = responseConverter;
     }
     
@@ -50,19 +50,19 @@ public class ProxyHandler implements InvocationHandler {
             // Step 1: Process annotations to create RequestDefinition
             RequestDefinition requestDefinition = annotationProcessor.process(method, args, serviceInterface);
             
-            // Step 2: Execute the HTTP request
-            Response response = requestExecutor.execute(requestDefinition);
+            // Step 2: Execute through interceptor chain (which includes request execution)
+            Response response = interceptorChain.proceed(requestDefinition);
             
             // Step 3: Convert response to method return type
             Object result = responseConverter.convert(response, method.getGenericReturnType());
             
-            logger.debug("Method invocation completed successfully: {}.{}", 
+            logger.debug("Method invocation completed successfully: {}.{}",
                         serviceInterface.getSimpleName(), method.getName());
             
             return result;
             
         } catch (Exception e) {
-            logger.error("Error invoking method {}.{}: {}", 
+            logger.error("Error invoking method {}.{}: {}",
                         serviceInterface.getSimpleName(), method.getName(), e.getMessage(), e);
             throw e;
         }

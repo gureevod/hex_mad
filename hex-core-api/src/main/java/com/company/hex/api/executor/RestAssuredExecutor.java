@@ -79,6 +79,20 @@ public class RestAssuredExecutor implements RequestExecutor {
             logger.debug("Added query params: {}", queryParams);
         }
         
+        // Add headers
+        Map<String, Object> headers = request.getHeaders();
+        if (!headers.isEmpty()) {
+            headers.forEach((key, value) -> spec.header(key, value));
+            logger.debug("Added headers: {}", headers);
+        }
+        
+        // Add form parameters
+        Map<String, Object> formParams = request.getFormParams();
+        if (!formParams.isEmpty()) {
+            formParams.forEach((key, value) -> spec.formParam(key, value));
+            logger.debug("Added form params: {}", formParams);
+        }
+        
         // Add request body
         if (request.getBody() != null) {
             spec.body(request.getBody());
