@@ -2,15 +2,31 @@ package com.company.hex.project.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * Data Transfer Object for User entity from JSONPlaceholder API.
  * Demonstrates declarative API usage with type-safe responses.
  * Uses @JsonIgnoreProperties to ignore nested objects (address, company) for MVP simplicity.
  *
+ * <p>Lombok annotations used:
+ * <ul>
+ *   <li>@Data - generates getters, setters, toString, equals, and hashCode</li>
+ *   <li>@Builder - provides builder pattern for object construction</li>
+ *   <li>@NoArgsConstructor - generates default constructor for Jackson</li>
+ *   <li>@AllArgsConstructor - generates constructor with all fields for builder</li>
+ * </ul>
+ *
  * @author Hex Framework
  * @version 1.0
  */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class UserDto {
     
@@ -31,75 +47,4 @@ public class UserDto {
     
     @JsonProperty("website")
     private String website;
-    
-    // Default constructor for Jackson
-    public UserDto() {
-    }
-    
-    public UserDto(int id, String name, String username, String email) {
-        this.id = id;
-        this.name = name;
-        this.username = username;
-        this.email = email;
-    }
-    
-    public int getId() {
-        return id;
-    }
-    
-    public void setId(int id) {
-        this.id = id;
-    }
-    
-    public String getName() {
-        return name;
-    }
-    
-    public void setName(String name) {
-        this.name = name;
-    }
-    
-    public String getEmail() {
-        return email;
-    }
-    
-    public void setEmail(String email) {
-        this.email = email;
-    }
-    
-    public String getUsername() {
-        return username;
-    }
-    
-    public void setUsername(String username) {
-        this.username = username;
-    }
-    
-    public String getPhone() {
-        return phone;
-    }
-    
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
-    
-    public String getWebsite() {
-        return website;
-    }
-    
-    public void setWebsite(String website) {
-        this.website = website;
-    }
-    
-    @Override
-    public String toString() {
-        return "UserDto{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", username='" + username + '\'' +
-                ", email='" + email + '\'' +
-                ", phone='" + phone + '\'' +
-                ", website='" + website + '\'' +
-                '}';
-    }
 }

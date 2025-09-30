@@ -216,11 +216,11 @@ public class UserApiImperativeService extends BaseApiService {
         
         for (Integer userId : userIds) {
             try {
-                CreateUserRequest updateRequest = new CreateUserRequest(
-                    (String) updates.getOrDefault("name", ""),
-                    (String) updates.getOrDefault("email", ""),
-                    (String) updates.getOrDefault("username", "")
-                );
+                CreateUserRequest updateRequest = CreateUserRequest.builder()
+                    .name((String) updates.getOrDefault("name", ""))
+                    .email((String) updates.getOrDefault("email", ""))
+                    .username((String) updates.getOrDefault("username", ""))
+                    .build();
                 
                 Response response = newRequest()
                     .pathParam("id", userId)
