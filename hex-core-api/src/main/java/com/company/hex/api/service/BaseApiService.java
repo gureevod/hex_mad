@@ -139,10 +139,22 @@ public abstract class BaseApiService {
     }
 
     /**
-     * Получить настроенную спецификацию запроса.
-     * 
-     * @return RequestSpecification
+     * Get the configured RequestSpecification for direct RestAssured usage.
+     * This is the "escape hatch" for complex scenarios requiring full RestAssured control.
+     *
+     * @return configured RequestSpecification
      */
+    protected RequestSpecification getRequestSpecification() {
+        return requestSpec;
+    }
+
+    /**
+     * Получить настроенную спецификацию запроса.
+     *
+     * @return RequestSpecification
+     * @deprecated Use {@link #getRequestSpecification()} instead
+     */
+    @Deprecated
     public RequestSpecification getRequestSpec() {
         return requestSpec;
     }
@@ -206,8 +218,106 @@ public abstract class BaseApiService {
     }
 
     /**
+     * Helper method for GET requests with type-safe response.
+     * Simplifies common GET operations in imperative services.
+     *
+     * @param <T> the response type
+     * @param path the request path
+     * @param responseType the class of the response type
+     * @return the response object
+     */
+    protected <T> T executeGet(String path, Class<T> responseType) {
+        logger.debug("Executing GET request to: {}", path);
+        return newRequest()
+            .when()
+            .get(path)
+            .then()
+            .extract()
+            .as(responseType);
+    }
+
+    /**
+     * Helper method for POST requests with body and type-safe response.
+     * Simplifies common POST operations in imperative services.
+     *
+     * @param <T> the response type
+     * @param path the request path
+     * @param body the request body
+     * @param responseType the class of the response type
+     * @return the response object
+     */
+    protected <T> T executePost(String path, Object body, Class<T> responseType) {
+        logger.debug("Executing POST request to: {} with body type: {}", path, body.getClass().getSimpleName());
+        return newRequest()
+            .body(body)
+            .when()
+            .post(path)
+            .then()
+            .extract()
+            .as(responseType);
+    }
+
+    /**
+     * Helper method for PUT requests with body and type-safe response.
+     * Simplifies common PUT operations in imperative services.
+     *
+     * @param <T> the response type
+     * @param path the request path
+     * @param body the request body
+     * @param responseType the class of the response type
+     * @return the response object
+     */
+    protected <T> T executePut(String path, Object body, Class<T> responseType) {
+        logger.debug("Executing PUT request to: {} with body type: {}", path, body.getClass().getSimpleName());
+        return newRequest()
+            .body(body)
+            .when()
+            .put(path)
+            .then()
+            .extract()
+            .as(responseType);
+    }
+
+    /**
+     * Helper method for DELETE requests.
+     * Simplifies common DELETE operations in imperative services.
+     *
+     * @param path the request path
+     */
+    protected void executeDelete(String path) {
+        logger.debug("Executing DELETE request to: {}", path);
+        newRequest()
+            .when()
+            .delete(path)
+            .then()
+            .extract()
+            .response();
+    }
+
+    /**
+     * Helper method for PATCH requests with body and type-safe response.
+     * Simplifies common PATCH operations in imperative services.
+     *
+     * @param <T> the response type
+     * @param path the request path
+     * @param body the request body
+     * @param responseType the class of the response type
+     * @return the response object
+     */
+    protected <T> T executePatch(String path, Object body, Class<T> responseType) {
+        logger.debug("Executing PATCH request to: {} with body type: {}", path, body.getClass().getSimpleName());
+        return newRequest()
+            .body(body)
+            .when()
+            .patch(path)
+            .then()
+            .extract()
+            .as(responseType);
+    }
+
+    /**
      * Получить имя сервиса для логирования.
-     * 
+     *
      * @return имя сервиса
      */
     protected String getServiceName() {

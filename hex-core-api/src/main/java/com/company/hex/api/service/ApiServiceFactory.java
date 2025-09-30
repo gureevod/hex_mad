@@ -297,4 +297,80 @@ public final class ApiServiceFactory {
             }
         }
     }
+
+    /**
+     * Get a pre-configured RequestExecutor for direct usage.
+     * Useful for one-off requests without creating a service.
+     * This is an "escape hatch" for scenarios requiring direct executor access.
+     *
+     * @return configured RequestExecutor instance
+     */
+    public static RequestExecutor getRequestExecutor() {
+        logger.debug("Creating RequestExecutor with default configuration");
+        return new RestAssuredExecutor();
+    }
+
+    /**
+     * Get a pre-configured RequestExecutor with custom configuration.
+     *
+     * @param config custom API configuration
+     * @return configured RequestExecutor instance
+     */
+    public static RequestExecutor getRequestExecutor(ApiConfig config) {
+        if (config == null) {
+            throw new HexConfigException("API configuration cannot be null");
+        }
+        logger.debug("Creating RequestExecutor with custom configuration");
+        return new RestAssuredExecutor(config);
+    }
+
+    /**
+     * Get a pre-configured RequestSpecification for direct RestAssured usage.
+     * This is the ultimate "escape hatch" for complex scenarios requiring full RestAssured control.
+     *
+     * @return configured RequestSpecification
+     */
+    public static io.restassured.specification.RequestSpecification getRequestSpecification() {
+        logger.debug("Creating RequestSpecification with default configuration");
+        ApiConfig config = HexConfigFactory.getConfig(ApiConfig.class);
+        return createRequestSpecification(config);
+    }
+
+    /**
+     * Get a pre-configured RequestSpecification with custom configuration.
+     *
+     * @param config custom API configuration
+     * @return configured RequestSpecification
+     */
+    public static io.restassured.specification.RequestSpecification getRequestSpecification(ApiConfig config) {
+        if (config == null) {
+            throw new HexConfigException("API configuration cannot be null");
+        }
+        logger.debug("Creating RequestSpecification with custom configuration");
+        return createRequestSpecification(config);
+    }
+
+    /**
+     * Internal method to create a configured RequestSpecification.
+     *
+     * @param config API configuration
+     * @return configured RequestSpecification
+     */
+    private static io.restassured.specification.RequestSpecification createRequestSpecification(ApiConfig config) {
+        io.restassured.specification.RequestSpecification spec = io.restassured.RestAssured.given()
+            .baseUri(config.baseUrl())
+            .contentType(config.defaultContentType())
+            .accept(config.defaultAccept());
+
+        // Add Allure integration
+        spec.filter(new io.qameta.allure.restassured.AllureRestAssured());
+
+        // Configure SSL if needed
+        if (!config.sslValidationEnabled()) {
+            spec.config(io.restassured.config.RestAssuredConfig.config()
+                .sslConfig(io.restassured.config.SSLConfig.sslConfig().relaxedHTTPSValidation()));
+        }
+
+        return spec;
+    }
 }
