@@ -23,7 +23,7 @@ This section outlines the strategy for testing the Hex framework's own component
         - Follow the AAA pattern (Arrange, Act, Assert).
         - Mock all external dependencies (e.g., mock a `SelenideElement` when testing a wrapper).
 - **Integration Tests:**
-    - **Scope:** To verify interactions between components within the Hex framework itself, not with an external application. For example, testing that the Google Guice injector correctly constructs a service with a configuration object.
+    - **Scope:** To verify interactions between components within the Hex framework itself, not with an external application.
     - **Location:** Within the `src/test/java` directory, but using a specific JUnit tag (`@Tag("integration")`) to separate them from fast-running unit tests.
     - **Test Infrastructure:** No external infrastructure needed. These tests will run entirely in-memory.
 - **End-to-End (E2E) Tests:**

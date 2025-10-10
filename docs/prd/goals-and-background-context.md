@@ -9,7 +9,7 @@
 - Deliver CI quickstart (Jenkinsfile) for consistent pipelines and artifact publishing.
 
 ### Background Context
-Hex is a modular Java 17/Maven automation framework unifying UI (Selenide) and API (RestAssured) testing with JUnit 5, Allure, Owner, Google Guice, and SLF4J/Logback. It separates reusable `hex-core` abstractions from `hex-project` implementations, emphasizing SOLID, Google Guice DI, and thread-safety by default. The framework addresses duplication of wrappers/utilities, onboarding friction, and inconsistent patterns, while enabling composite UI components and standardized API service/models. It targets both net-new projects and migrating teams, offering incremental paths and a Jenkins quickstart for faster adoption and reliability.
+Hex is a modular Java 17/Maven automation framework unifying UI (Selenide) and API (RestAssured) testing with JUnit 5, Allure, Owner, and SLF4J/Logback. It separates reusable `hex-core` abstractions from `hex-project` implementations, emphasizing SOLID, and thread-safety by default. The framework addresses duplication of wrappers/utilities, onboarding friction, and inconsistent patterns, while enabling composite UI components and standardized API service/models. It targets both net-new projects and migrating teams, offering incremental paths and a Jenkins quickstart for faster adoption and reliability.
 
 ### Change Log
 | Date | Version | Description | Author |

@@ -34,8 +34,7 @@
         <jsonschema2pojo.version>1.2.1</jsonschema2pojo.version>
         <assertj.version>3.25.3</assertj.version>
         <mockito.version>5.12.0</mockito.version>
-        <guice.version>7.0.0</guice.version>
-        
+        <aspectj.version>1.9.22</aspectj.version>
         <!-- Plugin Versions -->
         <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
         <maven.surefire.plugin.version>3.1.2</maven.surefire.plugin.version>
@@ -134,18 +133,18 @@
                 <version>${allure.version}</version>
             </dependency>
 
+            <!-- AspectJ for Allure -->
+            <dependency>
+                <groupId>org.aspectj</groupId>
+                <artifactId>aspectjweaver</artifactId>
+                <version>${aspectj.version}</version>
+            </dependency>
+
             <!-- Configuration -->
             <dependency>
                 <groupId>org.aeonbits.owner</groupId>
                 <artifactId>owner</artifactId>
                 <version>${owner.version}</version>
-            </dependency>
-
-            <!-- Dependency Injection -->
-            <dependency>
-                <groupId>com.google.inject</groupId>
-                <artifactId>guice</artifactId>
-                <version>${guice.version}</version>
             </dependency>
 
             <!-- Logging -->

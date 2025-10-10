@@ -24,12 +24,6 @@
             <artifactId>owner</artifactId>
         </dependency>
 
-        <!-- Dependency Injection -->
-        <dependency>
-            <groupId>com.google.inject</groupId>
-            <artifactId>guice</artifactId>
-        </dependency>
-
         <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>

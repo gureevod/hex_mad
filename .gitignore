@@ -1,8 +1,7 @@
-.bmad-core
-.roomodes
-
 .idea
 .vscode
+target/*
+hex-core/target/*
 hex-core-api/target/*
 hex-core-testing/target/*
 hex-core-ui/target/*
@@ -10,3 +9,5 @@ hex-core-common/target/*
 hex-project-samples/target/*
 hex-project-samples/allure-results/*
 hex-automation-framework/target/*
+hex-project-samples/.allure/
+hex-project-samples/build/*

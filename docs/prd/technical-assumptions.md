@@ -5,7 +5,7 @@
 
 ### Service Architecture
 - Monolith of modules within a monorepo: `hex-core`, `hex-core-api`, `hex-core-ui`, `hex-core-testing`, plus sample `hex-project-*` modules.
-- Clear separation of concerns: `hex-core` contains common, reusable abstractions (Google Guice DI, config); `hex-project` contains project-specific PageObjects, composites, services, and DTOs.
+- Clear separation of concerns: `hex-core` contains common, reusable abstractions; `hex-project` contains project-specific PageObjects, composites, services, and DTOs.
 
 ### Testing Requirements: Full Testing Pyramid
 - Unit tests for wrappers, utilities, and service layer helpers.

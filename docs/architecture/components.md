@@ -23,10 +23,9 @@ The Hex framework is decomposed into several key logical components, each implem
 ### `hex-core-testing`
 **Responsibility:** Provides the foundational testing infrastructure that glues the API and UI layers together. It contains cross-cutting concerns like test lifecycle management, reporting, and parallel execution setup.
 **Key Interfaces:**
-- `BaseTest`: A base test class for JUnit 5 that manages test lifecycle, DI context, and integration with Allure and logging.
+- `BaseTest`: A base test class for JUnit 5 that manages test lifecycle, context, and integration with Allure and logging.
 - `ConfigFactory`: A utility for creating and managing thread-safe configuration instances.
-- `GuiceModule`: Google Guice modules for dependency injection configuration and binding.
-**Dependencies:** JUnit 5, Allure, Owner, Google Guice, SLF4J/Logback. It has optional dependencies on `hex-core-api` and `hex-core-ui`.
+**Dependencies:** JUnit 5, Allure, Owner, SLF4J/Logback. It has optional dependencies on `hex-core-api` and `hex-core-ui`.
 **Technology Stack:** This component integrates the test runner (JUnit 5) with reporting, configuration, and logging libraries.
 
 ### `hex-project-samples` (Implementation Example)
@@ -49,7 +48,7 @@ graph TD
     end
 
     subgraph "Framework (`hex-core-*`)"
-        CoreTesting["`hex-core-testing` (Lifecycle, Reporting, DI)"]
+        CoreTesting["`hex-core-testing` (Lifecycle, Reporting, Factories)"]
         CoreUI["`hex-core-ui` (Wrappers, Components)"]
         CoreAPI["`hex-core-api` (Client, Services)"]
     end
@@ -72,5 +71,3 @@ graph TD
     CoreTesting --> Allure
     CoreUI --> Selenide
     CoreAPI --> RestAssured
-```
-
