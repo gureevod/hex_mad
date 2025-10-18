@@ -181,64 +181,207 @@
 
 ## Story 3.4: Builder API для сложных случаев
 
-**As a** tester,  
-**I want** fluent builder API для динамических локаторов и кастомизации,  
-**So that** я могу обрабатывать сложные сценарии без потери читаемости.
+**As a** tester,
+**I want** fluent builder API для составных локаторов и кастомных элементов,
+**So that** я могу элегантно обрабатывать сложные UI структуры на уровне PageObject.
 
 ### Acceptance Criteria:
 
 1. **Статические методы-билдеры**
-   - `input(String locator)` → `InputBuilder`
-   - `button(String locator)` → `ButtonBuilder`
-   - `checkbox(String locator)` → `CheckboxBuilder`
-   - `select(String locator)` → `SelectBuilder`
+   - `input()` → `InputBuilder`
+   - `button()` → `ButtonBuilder`
+   - `checkbox()` → `CheckboxBuilder`
+   - `select()` → `SelectBuilder`
+   - `element()` → `ElementBuilder` (generic)
    - Импортируются статически для удобства
 
-2. **Fluent API для кастомизации**
-   - `.withName(String name)` - обязательно для Allure steps
-   - `.withTimeout(Duration timeout)` - кастомный timeout
-   - `.withPollingInterval(Duration interval)` - интервал polling
-   - `.withRetry(int retries)` - количество повторов
-   - `.waitUntil(Condition condition, Duration timeout)` - ожидание условия
-
-3. **Динамические локаторы с параметрами**
-   - Локатор может содержать `%s` для подстановки
-   - Метод `.withParam(String param)` подставляет значение
+2. **Обязательные методы Builder API**
+   - `.withName(String name)` - **обязательно** для Allure steps и логирования
    - Пример:
      ```java
-     Input dynamicField = input("//input[@data-id='%s']")
-         .withName("Dynamic Field")
-         .withTimeout(Duration.ofSeconds(10));
-     
-     dynamicField.withParam("user-123").fill("value");
+     Input emailField = input()
+         .withName("Email Field")
+         .locator()
+             .base("//div[@class='form-container']")
+             .append("//input[@type='email']")
+             .build();
      ```
 
-4. **Множественные параметры**
-   - `.withParams(String... params)` для нескольких подстановок
-   - Пример: `button("//button[@data-page='%s'][@data-action='%s']")`
+3. **Composite Locator Builder (составные локаторы)**
+   - `.locator()` - начало построения составного локатора
+   - `.base(String xpath)` - базовая часть локатора
+   - `.append(String xpath)` - добавление части локатора
+   - `.append(String xpath, String placeholder)` - добавление с плейсхолдером для параметризации
+   - `.build()` - завершение построения локатора
+   - Пример простого составного локатора:
+     ```java
+     Button saveButton = button()
+         .withName("Save Button")
+         .locator()
+             .base("//div[@class='form-actions']")
+             .append("//button[@type='submit']")
+             .build();
+     ```
+   - Пример с параметризацией:
+     ```java
+     Input userField = input()
+         .withName("User Field")
+         .locator()
+             .base("//div[@class='user-container']")
+             .append("//section[@id='{section}']")
+             .append("//input[@data-field='{field}']")
+             .build();
+     
+     // Использование в тесте
+     userField.resolve("section", "profile", "field", "email")
+         .fill("user@example.com");
+     
+     userField.resolve("section", "settings", "field", "phone")
+         .fill("+1234567890");
+     ```
+   - Пример сложного многоуровневого локатора:
+     ```java
+     Button actionButton = button()
+         .withName("Dynamic Action Button")
+         .locator()
+             .base("//div[@class='dashboard']")
+             .append("//section[@data-section='{section}']")
+             .append("//div[@class='actions-panel']")
+             .append("//button[@data-action='{action}']")
+             .build();
+     
+     // Использование
+     actionButton.resolve("section", "users", "action", "delete").click();
+     actionButton.resolve("section", "reports", "action", "export").click();
+     ```
 
-5. **Комбинирование с аннотациями**
+4. **Альтернативный синтаксис для простых случаев**
+   - Для простых локаторов без параметризации можно использовать короткий синтаксис:
+     ```java
+     Input email = input("//input[@type='email']")
+         .withName("Email Field");
+     
+     // Эквивалентно:
+     Input email = input()
+         .withName("Email Field")
+         .locator()
+             .base("//input[@type='email']")
+             .build();
+     ```
+
+5. **Кастомная имплементация элемента**
+   - `.withCustomImplementation(Class<? extends BaseElement> implClass)` - использование кастомного класса
+   - `.as(Class<T> elementClass)` - более короткий синтаксис
+   - Позволяет использовать специализированные элементы (RichTextEditor, DatePicker, etc.)
+   - Пример:
+     ```java
+     RichTextEditor editor = input("//div[@class='rich-editor']")
+         .withName("Article Content")
+         .withCustomImplementation(RichTextEditor.class);
+     
+     // Или короче
+     DatePicker birthDate = element("//div[@class='datepicker']")
+         .withName("Birth Date")
+         .as(DatePicker.class);
+     
+     // С составным локатором
+     RichTextEditor dynamicEditor = input()
+         .withName("Section Editor")
+         .locator()
+             .base("//section[@id='{section}']")
+             .append("//div[@class='rich-editor']")
+             .build()
+         .as(RichTextEditor.class);
+     
+     dynamicEditor.resolve("section", "article").setHtmlContent("<p>Content</p>");
+     ```
+
+6. **Комбинирование с аннотациями**
    - В одном Page можно использовать и аннотации, и builder API
    - Builder API для сложных случаев, аннотации для простых
    - Пример:
      ```java
-     @Element(name = "Username", xpath = "//input[@id='username']")
-     Input username;  // простой случай
+     @Page(url = "/user/profile", title = "User Profile")
+     public class UserProfilePage extends BasePage {
+         
+         // Простые статические элементы через аннотации
+         @Element(name = "First Name", xpath = "//input[@id='firstName']")
+         Input firstName;
+         
+         @Element(name = "Last Name", xpath = "//input[@id='lastName']")
+         Input lastName;
+         
+         // Сложные составные локаторы через Builder API
+         private final Input dynamicField = input()
+             .withName("Dynamic User Field")
+             .locator()
+                 .base("//div[@class='profile-form']")
+                 .append("//div[@data-section='{section}']")
+                 .append("//input[@data-field='{field}']")
+                 .build();
+         
+         private final Button actionButton = button()
+             .withName("Profile Action")
+             .locator()
+                 .base("//div[@class='profile-actions']")
+                 .append("//button[@data-action='{action}']")
+                 .build();
+         
+         @Step("Update user field: {section}.{fieldName}")
+         public UserProfilePage updateField(String section, String fieldName, String value) {
+             dynamicField.resolve("section", section, "field", fieldName).fill(value);
+             return this;
+         }
+         
+         @Step("Perform action: {action}")
+         public UserProfilePage performAction(String action) {
+             actionButton.resolve("action", action).click();
+             return this;
+         }
+     }
      
-     private final Input dynamicField = input("//input[@data-id='%s']")
-         .withName("Dynamic Field");  // сложный случай
+     // Использование в тесте
+     userProfilePage
+         .updateField("personal", "email", "new@example.com")
+         .updateField("personal", "phone", "+1234567890")
+         .updateField("address", "city", "New York")
+         .performAction("save");
      ```
 
-6. **Примеры использования**
-   - Динамические таблицы
-   - Параметризованные формы
-   - Условные элементы
-   - Медленно загружающиеся элементы
+7. **Примеры использования**
+   - Динамические таблицы с многоуровневыми локаторами
+   - Параметризованные формы с повторяющимися полями
+   - Сложные UI компоненты с вложенной структурой
+   - Кастомные элементы (DatePicker, RichTextEditor, AutoComplete)
+   - Пример сложной таблицы:
+     ```java
+     Button cellButton = button()
+         .withName("Table Cell Button")
+         .locator()
+             .base("//table[@id='users']")
+             .append("//tr[@data-user-id='{userId}']")
+             .append("//td[@data-column='{column}']")
+             .append("//button[@data-action='{action}']")
+             .build();
+     
+     // Использование
+     cellButton.resolve("userId", "123", "column", "actions", "action", "edit").click();
+     cellButton.resolve("userId", "456", "column", "status", "action", "activate").click();
+     ```
 
 ### Technical Notes:
-- Builder возвращает тот же тип элемента (Input, Button, etc.)
-- Параметры применяются при каждом вызове метода элемента
-- Thread-safe - каждый вызов создает новый контекст
+- Builder возвращает тот же тип элемента ([`Input`](hex-core-ui/src/main/java/com/company/hex/ui/elements/Input.java), [`Button`](hex-core-ui/src/main/java/com/company/hex/ui/elements/Button.java), etc.)
+- Метод `.resolve()` создает новый экземпляр элемента с подставленными параметрами
+- Thread-safe - каждый вызов `.resolve()` создает независимый контекст
+- Плейсхолдеры в локаторах используют формат `{paramName}` для читаемости
+- **Timeout, polling, retry настраиваются на уровне теста через Selenide Configuration**
+
+### Out of Scope (НЕ в Builder API на уровне PageObject):
+- ❌ `.withTimeout()` - должен быть на уровне теста
+- ❌ `.withPollingInterval()` - должен быть на уровне теста
+- ❌ `.withRetry()` - должен быть на уровне теста
+- ❌ `.waitUntil()` - должен быть на уровне теста
+- ❌ Валидация элементов - должна быть на уровне теста
 
 ---
 
