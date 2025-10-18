@@ -377,69 +377,284 @@
 
 ---
 
-## Story 3.5: ElementList для работы с коллекциями
+Story 3.5 (обновлено): ElementList для работы с коллекциями
 
-**As a** UI developer,  
-**I want** удобный API для работы с коллекциями элементов,  
-**So that** я могу фильтровать, искать и проверять списки элементов.
+As a UI developer,
+I want удобный, типобезопасный и «живой» API для коллекций элементов,
+So that я могу фильтровать, искать, проверять и обрабатывать списки элементов с минимальным boilerplate, полным контекстом в логах и аккуратными Allure steps.
 
-### Acceptance Criteria:
+Acceptance Criteria
 
-1. **Класс `ElementList<T extends BaseElement>`**
-   - Обертка над Selenide `ElementsCollection`
-   - Типобезопасная - работает с конкретными типами элементов
-   - Implements `Iterable<T>` для использования в for-each
+1) Класс и типизация
+- Реализовать `ElementList<T extends BaseElement>` как тонкую обёртку над Selenide `ElementsCollection`.
+- Поддержка «живой» коллекции (ленивая резолвация) и потокобезопасная иммутабельность.
+- Реализовать `Iterable<T>` и `Spliterator<T>`.
+- Каждый элемент внутри списка лениво оборачивается через `ElementFactory` с именем `"{collectionName}[{index}]"` (индексация 0‑based).
+- Хранить контекст `UiContext` (pageName, componentName) для логов и Allure.
 
-2. **Методы доступа**
-   - `size()` - количество элементов
-   - `get(int index)` - элемент по индексу
-   - `first()` - первый элемент
-   - `last()` - последний элемент
-   - `isEmpty()` - проверка на пустоту
+2) Методы доступа
+- `int size()`
+- `T get(int index)` и синоним `nth(int index)`
+- `T first()`, `T last()`
+- `boolean isEmpty()`
+- `T single()` — ожидает ровно один элемент (иначе кидает информативное исключение).
 
-3. **Функциональные методы**
-   - `filter(Predicate<T> predicate)` - фильтрация, возвращает новый ElementList
-   - `findFirst(Predicate<T> predicate)` - поиск первого, возвращает Optional<T>
-   - `map(Function<T, R> mapper)` - маппинг в Stream<R>
-   - `forEach(Consumer<T> action)` - итерация
-   - `stream()` - получение Stream<T>
+3) Функциональные методы
+- «Ожидающие» (через Selenide):
+  - `ElementList<T> filterBy(Condition condition)`
+  - `Optional<T> findBy(Condition condition)` — использует `elements.findBy()`
+- «Гибкие» (через Java-предикаты; работают по снэпшоту):
+  - `ElementList<T> filter(Predicate<T> predicate)` — возвращает новый список на основе `snapshot()`
+  - `Optional<T> findFirst(Predicate<T> predicate)`
+- Потоки и трансформации:
+  - `Stream<T> stream()`
+  - `Stream<R> map(Function<T, R> mapper)`
+  - `void forEach(Consumer<T> action)`
+- Утилиты для быстрых извлечений:
+  - `List<String> texts()` — прокладка к `elements.texts()`
+  - `List<String> attributes(String name)`
+  - `List<String> values()` — сахар для `attributes("value")`
+- «Эвакуационный люк» и материализация:
+  - `ElementsCollection asSelenide()`
+  - `List<T> snapshot()` — материализовать текущую выборку в список элементов (фиксирует состав коллекции на момент вызова).
 
-4. **Assertions для коллекций**
-   - `shouldHaveSize(int expected)` - проверка размера
-   - `shouldNotBeEmpty()` - проверка что не пустая
-   - `shouldBeEmpty()` - проверка что пустая
-   - Все assertions возвращают this для цепочек
+4) Assertions для коллекций
+- Мост к `CollectionCondition`:
+  - `ElementList<T> shouldHave(CollectionCondition... conditions)`
+- Часто используемые шорткаты:
+  - `ElementList<T> shouldHaveSize(int expected)`
+  - `ElementList<T> shouldBeEmpty()`
+  - `ElementList<T> shouldNotBeEmpty()`
+- Дополнительные коллекционные условия (минимальный набор):
+  - `CollectionConditions.anyMatch(Condition condition)`
+  - `CollectionConditions.allMatch(Condition condition)`
+  - `CollectionConditions.textsContain(String... parts)` — проверка, что хотя бы один элемент содержит соответствующий текст (или документировать точную семантику).
 
-5. **Автоматические Allure steps**
-   - Все операции создают steps: "Filter 'Menu Items'", "Get size of 'Cards'"
-   - Имя коллекции берется из аннотации `@Elements(name = "...")`
+5) Allure и логирование
+- Все публичные операции `ElementList` создают один агрегированный Allure step уровня коллекции (без спама по каждому элементу).
+  - Примеры названий шагов: 
+    - "Filter 'Product Cards' by condition 'matchText: Premium'"
+    - "Get size of 'Product Cards'"
+    - "Map over 'Product Cards' → texts()"
+- Логи через SLF4J:
+  - `INFO` — агрегированные сообщения в духе Allure шага.
+  - `DEBUG` — детализированный перебор: индексы, тексты, атрибуты, результаты фильтров (перечисление всех затронутых элементов).
+- Скриншоты делаются только при ошибках глобальным JUnit 5 listener (как в проекте), без снимков в успешных шагах.
 
-6. **Примеры использования**
-   - Фильтрация списка по условию
-   - Поиск элемента с определенным текстом
-   - Получение всех текстов из списка
-   - Проверка количества элементов
-   - Пример:
-     ```java
-     @Elements(name = "Product Cards", xpath = "//div[@class='product']")
-     ElementList<Button> products;
-     
-     // Использование
-     products.shouldHaveSize(10);
-     
-     Button premiumProduct = products
-         .findFirst(p -> p.getText().contains("Premium"))
-         .orElseThrow();
-     
-     List<String> names = products
-         .map(Button::getText)
-         .collect(Collectors.toList());
-     ```
+6) Builder для коллекций (симметрия с 3.4)
+- Статические фабрики (импортируются статически):
+  - `elements(Class<T> type)` → `ElementListBuilder<T>`
+  - Сугары для популярных типов: `buttons()`, `inputs()`, `checkboxes()`, `selects()`
+  - Короткий синтаксис: `elements(Class<T> type, String xpathOrCss)`
+- Обязательные шаги билдера:
+  - `.withName(String name)` — обязательно для контекста Allure/логов
+  - `.locator()` → композитный билдер локатора с тем же DSL, что и для одиночных элементов:
+    - `.base(String xpathOrCss)`
+    - `.append(String xpathOrCss)` 
+    - `.append(String xpathOrCss, String placeholder)`
+    - `.buildList()` — завершение и возврат `ElementList<T>`
+- Плейсхолдеры в локаторе формата `{param}`:
+  - `ElementList<T> resolve(Object... nameValuePairs)` — возвращает новый `ElementList<T>` с подставленными значениями.
+- Симметрия с `@Elements`:
+  - Аннотация `@Elements(name, xpath|css)` создаёт тот же `ElementList<T>` через `ElementFactory`, тип `T` берётся из дженерика поля.
 
-### Technical Notes:
-- Lazy инициализация элементов в коллекции
-- Каждый элемент получает имя вида "CollectionName[index]"
-- Thread-safe операции
+7) Lazy-инициализация и «живость»
+- Внутри `ElementList` хранится `Supplier<ElementsCollection>` или ленивый `By` + скопированный root компонента (scope), чтобы коллекция всегда отражала текущее состояние DOM.
+- Методы с предикатами Java (`filter`, `findFirst`) работают по `snapshot()` для предсказуемости и производительности, о чём указано в JavaDoc.
+
+8) Именование и индексация
+- Индексация 0‑based во всех именах и сообщениях.
+- Формат имени элемента в коллекции: `"{collectionName}[{index}]"`.
+- Имя коллекции берётся из `@Elements(name = "...")` или `.withName(...)` в билдере.
+
+9) Сообщения об ошибках
+- `get(index)` вне диапазона: "Index 5 out of bounds for 'Product Cards' (size=3) in page 'Dashboard' component 'Catalog'".
+- `single()` при `size != 1`: 
+  - size=0 — "Expected exactly one element in 'X', but found none".
+  - size>1 — "Expected exactly one element in 'X', but found N".
+- `findBy(Condition)` ничего не нашёл: возвращается `Optional.empty()`; для ассерт‑варианта можно добавить `singleBy(Condition)` (опционально) с аналогичными сообщениями.
+
+10) Потокобезопасность и (не)кэширование
+- `ElementList` — неизменяемый объект; любые трансформации возвращают новый инстанс со своим `resolver`.
+- По умолчанию — без кэширования `SelenideElement`/`ElementsCollection`; материализация — только через `snapshot()`.
+
+11) Производительность
+- Внутренние обходы коллекции (например, `map`, `texts`, `attributes`) выполняются максимально близко к `ElementsCollection` API (использовать `texts()` при возможности).
+- Для долгих операций (например, `forEach` с пользовательским действием) — один агрегированный Allure step; внутри дебаг‑лог по каждому элементу.
+
+12) Совместимость с 3.1–3.4
+- Работает внутри `@Page`, `@Component`, учитывает относительные локаторы компонентов (начиная с `.//`) и прокидывает `UiContext`.
+- Билдер коллекций использует тот же `CompositeLocatorBuilder`, что и одиночные элементы.
+- Метод `.resolve()` у `ElementList` ведёт себя так же, как у одиночных элементов: возвращает новый инстанс с подставленными плейсхолдерами.
+
+API эскизы
+
+Интерфейс `ElementList`
+```java
+public final class ElementList<T extends BaseElement> implements Iterable<T> {
+  private final String name;
+  private final Supplier<ElementsCollection> resolver;
+  private final Class<T> type;
+  private final UiContext context;            // pageName, componentName
+  private final ElementFactory factory;       // create(Class<T>, String, SelenideElement, UiContext)
+
+  // Доступ
+  public int size();
+  public boolean isEmpty();
+  public T get(int index);
+  public T nth(int index);
+  public T first();
+  public T last();
+  public T single();
+
+  // Фильтрация/поиск
+  public ElementList<T> filterBy(Condition condition);
+  public Optional<T> findBy(Condition condition);
+  public ElementList<T> filter(Predicate<T> predicate);     // по snapshot()
+  public Optional<T> findFirst(Predicate<T> predicate);     // по snapshot()
+
+  // Потоки и маппинги
+  public Stream<T> stream();
+  public <R> Stream<R> map(Function<T, R> mapper);
+  public void forEach(Consumer<T> action);
+
+  // Утилиты
+  public List<String> texts();
+  public List<String> attributes(String name);
+  public List<String> values();
+
+  // Assertions
+  public ElementList<T> shouldHave(CollectionCondition... conditions);
+  public ElementList<T> shouldHaveSize(int expected);
+  public ElementList<T> shouldBeEmpty();
+  public ElementList<T> shouldNotBeEmpty();
+
+  // «Люки»
+  public ElementsCollection asSelenide();
+  public List<T> snapshot();
+
+  // Параметризация
+  public ElementList<T> resolve(Object... nameValuePairs);
+
+  @Override public Iterator<T> iterator();
+}
+```
+
+Builder коллекций
+```java
+// Импортируются статически аналогично builder’ам одиночных элементов
+public final class ElementListBuilders {
+  public static <T extends BaseElement> ElementListBuilder<T> elements(Class<T> type) { ... }
+  public static ElementListUntypedBuilder elements(String xpathOrCss) { ... } // затем .as(Class<T>)
+  public static ElementListBuilder<Button> buttons() { ... }
+  public static ElementListBuilder<Input> inputs() { ... }
+  public static ElementListBuilder<Checkbox> checkboxes() { ... }
+  public static ElementListBuilder<Select> selects() { ... }
+}
+
+public interface ElementListBuilder<T extends BaseElement> {
+  ElementListBuilder<T> withName(String name);
+  CompositeLocatorBuilder locator(); // тот же интерфейс, что в 3.4
+  ElementList<T> buildList();
+
+  // Короткий путь без locator():
+  ElementListBuilder<T> at(String xpathOrCss); // эквивалент locator().base(...).buildList()
+}
+
+public interface ElementListUntypedBuilder {
+  ElementListUntypedBuilder withName(String name);
+  CompositeLocatorBuilder locator();
+  <T extends BaseElement> ElementList<T> as(Class<T> type); // завершение сборки
+  ElementListUntypedBuilder at(String xpathOrCss);
+}
+```
+
+Примеры использования
+
+1) Через аннотацию
+```java
+@Elements(name = "Product Cards", xpath = "//div[@class='product']")
+ElementList<Button> products;
+
+products.shouldNotBeEmpty()
+        .filterBy(visible)
+        .shouldHaveSize(10);
+
+Button premium = products.findBy(matchText("Premium"))
+                         .orElseThrow();
+
+List<String> names = products.texts();
+```
+
+2) Через билдер (простой локатор)
+```java
+ElementList<Button> products = elements(Button.class, "//div[@class='product']")
+    .withName("Product Cards")
+    .buildList();
+
+products.filterBy(visible).nth(2).click();
+```
+
+3) Через композитный локатор и плейсхолдеры
+```java
+ElementList<Button> tableActions = buttons()
+    .withName("Users Table Actions")
+    .locator()
+      .base("//table[@id='{tableId}']")
+      .append(".//tr[@data-user-id='{userId}']")
+      .append(".//button[@data-action='{action}']")
+      .buildList();
+
+tableActions.resolve("tableId", "users", "userId", "123", "action", "edit")
+            .single()
+            .click();
+```
+
+4) «Гибкая» фильтрация по снэпшоту с аггрегированными шагами
+```java
+List<Button> visiblePremium = products.snapshot().stream()
+    .filter(b -> b.shouldHave(visible).getText().contains("Premium"))
+    .toList();
+
+visiblePremium.forEach(Button::click);
+```
+
+Логирование и шаги (семантика)
+- Пример INFO шага при `filterBy(matchText("Premium"))`:
+  - Allure: "Filter 'Product Cards' by condition 'matchText: Premium'"
+  - Лог INFO: "Filter 'Product Cards' by condition 'matchText: Premium' in page 'Dashboard' component 'Catalog'"
+  - Лог DEBUG:
+    - "Before filter: size=15; items=[Product Cards[0]='Basic' ... Product Cards[14]='Premium XL']"
+    - "After filter: size=2; items=[Product Cards[3]='Premium', Product Cards[14]='Premium XL']"
+
+Технические заметки (реализация)
+- Внутри `ElementList`:
+  - `resolver: Supplier<ElementsCollection>`; для `@Elements` и билдера — создаётся из `By`/`SelenideElement` root компонента.
+  - Оборачивание элемента: `factory.create(type, itemName(index), selenideElement, context)`.
+  - `filterBy` возвращает новый `ElementList` c `resolver = () -> resolver.get().filter(condition)`.
+  - `findBy` — получает `SelenideElement el = resolver.get().findBy(condition)`; при существовании оборачивает; имя можно проставить как первый подходящий индекс, либо `"{name}[?]"` (рекомендуется вычислить индекс через `indexOf(el)` если это не будет дорого).
+- Исключения:
+  - Свои доменные исключения `UiCollectionException` с полным контекстом.
+- JavaDoc:
+  - Подчеркнуть разницу между «ожидающими» методами (через Selenide) и «снэпшотными».
+- Unit‑тесты:
+  - Размер/пустота/границы.
+  - `filterBy/findBy` с условиями.
+  - `snapshot()/filter(Predicate)` семантика.
+  - Именование элементов и корректная 0‑based индексация.
+  - Агрегация Allure steps (проверка через listener/mocks).
+- Не дублировать Selenide‑конфигурацию: таймауты/поллинг берутся из глобальных настроек (как зафиксировано в Epics).
+
+Out of Scope
+- Любые собственные таймауты/ретраи/ожидания на уровне `ElementList`.
+- `ComponentList` (согласовано, не нужен в 3.5).
+- Скриншоты на успешных операциях.
+
+Итого
+- `ElementList<T>` — типобезопасный, «живой» слой над `ElementsCollection` с аккуратными Allure steps (агрегация) и подробными DEBUG‑логами.
+- Симметричный билдер для коллекций (3.4/3.5) c тем же DSL композитных локаторов и `.resolve(...)`.
+- Минимальный, но полезный расширенный API: `filterBy/findBy`, `texts/attributes/values`, `single`, `snapshot`, `asSelenide`, шорткаты assertions.
+- Полная интеграция с контекстом страницы/компонента и существующей фабрикой элементов.
 
 ---
 
