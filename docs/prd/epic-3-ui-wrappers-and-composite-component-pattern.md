@@ -1,63 +1,480 @@
-# Epic 3: UI Wrappers and Composite Component Pattern
-**Epic Goal:** Deliver extensible Selenide wrappers and a composite component base so teams can implement business-centric components and compose PageObjects cleanly.
+# Epic 3: Декларативный UI Framework с минимальным boilerplate
 
-**Story 3.1: Wrapper Base and Core Elements**
-As a UI test developer,
-I want robust element wrappers,
-so that common actions are reliable and expressive.
-**Acceptance Criteria:**
-1. Base `Element` with locator, waits, visibility, and common assertions with Allure steps.
-2. Concrete wrappers: `Button`, `Input`, `Checkbox`, `Select`, extend base and add idiomatic actions.
-3. SLF4J-based logging for actions; no direct `SelenideElement` exposure in tests.
-4. Fluent assertion helpers with clear failure messages.
+**Epic Goal:** Создать декларативный UI framework с гибридным подходом (аннотации + builder API), который минимизирует boilerplate код и обеспечивает автоматическое логирование и Allure steps с полным контекстом.
 
-**Story 3.2: Composite Component Base**
-As a framework user,
-I want a base for composite components,
-so that I can define business-level components once and reuse them.
-**Acceptance Criteria:**
-1. `Component` base supports nested elements, local waits, and domain methods.
-2. Guidance on parametrized components and scoping (root locator).
-3. Thread-safe design—no shared state; page/context passed explicitly as needed.
-4. Allure step conventions for component actions.
+---
 
-**Story 3.3: PageObject Composition Patterns**
-As a developer,
-I want PageObject patterns that compose wrappers and composites,
-so that tests are readable and maintainable.
-**Acceptance Criteria:**
-1. Sample `hex-project` PageObjects composed from wrappers and composites.
-2. Clear guidance discouraging test-level raw locators.
-3. Examples for synchronization patterns and common gotchas (stale elements).
-4. Demonstrate assertions at component and page levels.
+## Story 3.1: Базовые элементы и аннотации
 
-**Story 3.4: Assertions and Waiting Utilities**
-As a tester,
-I want consistent waiting and assertion utilities,
-so that tests fail fast with actionable feedback.
-**Acceptance Criteria:**
-1. Utilities expose common conditions with timeouts and polling defaults.
-2. Assertion helpers integrate with Allure and use informative messages.
-3. Thread-safe configuration of timeouts per test.
-4. Examples cover dynamic content (modals, toasts).
+**As a** UI test developer,  
+**I want** типобезопасные элементы с декларативным API,  
+**So that** я могу описывать Page Objects с минимумом кода.
 
-**Story 3.5: Sample Composites in `hex-project` (not in core)**
-As a maintainer,
-I want non-core sample composites,
-so that teams see practical usage without polluting `hex-core`.
-**Acceptance Criteria:**
-1. Sample `Table`, `Navbar`, `Modal` in `hex-project` only.
-2. Example tests demonstrate composition and business methods.
-3. Docs explicitly state no concrete composites ship in `hex-core`.
-4. CI runs UI examples headless.
+### Acceptance Criteria:
 
-**Story 3.6: Collection Abstractions over ElementsCollection**
-As a UI developer,
-I want to work with collections of elements easily,
-so that I can filter, map, and assert on lists of components.
-**Acceptance Criteria:**
-1. A typed wrapper around `ElementsCollection` provides common operations (size, filter, find, text assertions).
-2. The collection wrapper includes built-in waits and Allure step conventions.
-3. The design is thread-safe with no shared mutable state.
-4. Example usage is provided in `hex-project` with a Russian README.
-
+1. **Базовый класс `BaseElement`**
+   - Содержит имя элемента, SelenideElement, logger
+   - Хранит контекст: pageName, componentName для логирования
+   - Предоставляет базовые методы: click(), getText(), getAttribute()
+   - Все методы автоматически создают Allure steps
+   - Логирование через SLF4J с полным контекстом: "Action on 'Element' in page 'Page' component 'Component'"
+
+2. **Конкретные типы элементов**
+   - `Input`: fill(), clear(), append(), getValue(), shouldHaveValue(), shouldBeEmpty()
+   - `Button`: click(), doubleClick(), hover()
+   - `Checkbox`: check(), uncheck(), toggle(), isChecked(), shouldBe(checked/unchecked)
+   - `Select`: selectByText(), selectByValue(), selectByIndex(), getSelectedText(), getAllOptions()
+   - `TextElement`: getText(), shouldHave(text())
+   - Все элементы поддерживают fluent API для цепочек вызовов
+
+3. **Аннотация `@Element`**
+   - Обязательные параметры: `name` (для Allure steps и логов)
+   - Локатор: `xpath` или `css` (один обязателен)
+   - Опциональные: `timeout`, `pollingInterval`
+   - Пример: `@Element(name = "Username", xpath = "//input[@id='username']")`
+
+4. **Аннотация `@Elements` для коллекций**
+   - Те же параметры что и `@Element`
+   - Возвращает `ElementList<T>` с методами filter(), find(), map()
+   - Пример: `@Elements(name = "Menu Items", xpath = "//li[@class='menu-item']")`
+
+5. **Fluent assertions**
+   - Все элементы поддерживают: shouldBe(), shouldHave(), shouldNotHave()
+   - Можно передавать несколько условий: `element.shouldBe(visible, enabled)`
+   - Возвращают this для цепочек вызовов
+
+6. **Логирование**
+   - Каждое действие логируется через SLF4J
+   - Формат: `"Action on 'ElementName' in page 'PageName' component 'ComponentName'"`
+   - Скриншоты делаются ТОЛЬКО при ошибках через JUnit 5 lifecycle listener
+   - НЕТ скриншотов на каждом действии
+
+### Technical Notes:
+- Lazy инициализация через Java Proxy
+- Thread-safe без shared state
+- Интеграция с Selenide для всех операций
+- Автоматическая генерация Allure steps через `@Step` аннотацию
+
+---
+
+## Story 3.2: Компоненты с гибким scoping
+
+**As a** framework user,  
+**I want** переиспользуемые компоненты с гибким root локатором,  
+**So that** я могу использовать один компонент на разных страницах с разными локаторами.
+
+### Acceptance Criteria:
+
+1. **Базовый класс `BaseComponent`**
+   - Абстрактный класс для всех компонентов
+   - Содержит имя компонента (для логирования)
+   - Поддерживает вложенные элементы через `@Element` и `@Elements`
+   - Все элементы внутри компонента используют относительные локаторы (начинаются с `.//`)
+
+2. **Аннотация `@Component`**
+   - Обязательные параметры: `name` (для логирования и Allure steps), `root` (локатор корневого элемента)
+   - Пример: `@Component(name = "Main Header", root = "//header[@id='main-header']")`
+   - Root локатор указывается в Page, а не в самом компоненте
+
+3. **Контекстное логирование в компонентах**
+   - Все действия в компоненте логируются с именем компонента
+   - Формат: `"Action on 'Element' in page 'Page' component 'ComponentName'"`
+   - Allure steps включают имя компонента: `"Navigate to home from 'Main Header'"`
+
+4. **Переиспользование компонентов**
+   - Один класс компонента можно использовать на разных страницах
+   - Root локатор и имя указываются в аннотации `@Component` на странице
+   - Пример:
+     ```java
+     @Component(name = "Main Header", root = "//header[@id='main']")
+     HeaderComponent mainHeader;
+     
+     @Component(name = "Mobile Header", root = "//header[@id='mobile']")
+     HeaderComponent mobileHeader;
+     ```
+
+5. **Thread-safe дизайн**
+   - Нет shared state между компонентами
+   - Каждый экземпляр компонента независим
+   - Lazy инициализация элементов внутри компонента
+
+6. **Вложенные компоненты**
+   - Компоненты могут содержать другие компоненты
+   - Root локаторы вложенных компонентов относительны к родительскому
+
+### Technical Notes:
+- Компоненты инициализируются через тот же механизм что и Page Objects
+- Root локатор передается в контекст при инициализации элементов
+- Все локаторы внутри компонента должны быть относительными (`.//`)
+
+---
+
+## Story 3.3: Page Objects с декларативным API
+
+**As a** developer,  
+**I want** простой способ создания Page Objects,  
+**So that** я могу фокусироваться на бизнес-логике, а не на технических деталях.
+
+### Acceptance Criteria:
+
+1. **Аннотация `@Page`**
+   - Параметры: `url` (относительный путь), `title` (для логирования)
+   - Пример: `@Page(url = "/login", title = "Login Page")`
+   - URL используется для метода `open()`
+
+2. **Базовый класс `BasePage`**
+   - Абстрактный класс для всех страниц
+   - Автоматическая инициализация всех полей с аннотациями в конструкторе
+   - Метод `open()` для открытия страницы
+   - Метод `isOpened()` для проверки что страница открыта (опционально)
+
+3. **Минимальный boilerplate**
+   - НЕТ необходимости в конструкторах
+   - НЕТ необходимости в factory методах
+   - НЕТ необходимости в методах-обертках для каждого элемента
+   - Прямое использование элементов: `page.username.fill("john")`
+
+4. **Композиция из элементов и компонентов**
+   - Page может содержать `@Element`, `@Elements`, `@Component`
+   - Все инициализируется автоматически
+   - Пример:
+     ```java
+     @Page(url = "/dashboard", title = "Dashboard")
+     public class DashboardPage extends BasePage {
+         @Element(name = "Welcome Message", xpath = "//h1[@class='welcome']")
+         TextElement welcomeMessage;
+         
+         @Component(name = "Header", root = "//header")
+         HeaderComponent header;
+         
+         @Elements(name = "Cards", xpath = "//div[@class='card']")
+         ElementList<Button> cards;
+     }
+     ```
+
+5. **Бизнес-методы с явными steps**
+   - Для сложной бизнес-логики создаются методы с `@Step`
+   - Внутри методов используются элементы напрямую
+   - Каждое действие с элементом создает вложенный step
+   - Пример:
+     ```java
+     @Step("Login as {username}")
+     public HomePage login(String username, String password) {
+         this.username.fill(username);  // вложенный step
+         this.password.fill(password);  // вложенный step
+         loginButton.click();           // вложенный step
+         return new HomePage();
+     }
+     ```
+
+6. **Примеры в `hex-project-samples`**
+   - LoginPage, HomePage, DashboardPage
+   - Демонстрация всех возможностей
+   - README на русском языке с примерами использования
+
+### Technical Notes:
+- Инициализация через `FieldInitializer` в конструкторе `BasePage`
+- Поддержка наследования - инициализируются поля всей иерархии классов
+- Page name передается в контекст всех элементов для логирования
+
+---
+
+## Story 3.4: Builder API для сложных случаев
+
+**As a** tester,  
+**I want** fluent builder API для динамических локаторов и кастомизации,  
+**So that** я могу обрабатывать сложные сценарии без потери читаемости.
+
+### Acceptance Criteria:
+
+1. **Статические методы-билдеры**
+   - `input(String locator)` → `InputBuilder`
+   - `button(String locator)` → `ButtonBuilder`
+   - `checkbox(String locator)` → `CheckboxBuilder`
+   - `select(String locator)` → `SelectBuilder`
+   - Импортируются статически для удобства
+
+2. **Fluent API для кастомизации**
+   - `.withName(String name)` - обязательно для Allure steps
+   - `.withTimeout(Duration timeout)` - кастомный timeout
+   - `.withPollingInterval(Duration interval)` - интервал polling
+   - `.withRetry(int retries)` - количество повторов
+   - `.waitUntil(Condition condition, Duration timeout)` - ожидание условия
+
+3. **Динамические локаторы с параметрами**
+   - Локатор может содержать `%s` для подстановки
+   - Метод `.withParam(String param)` подставляет значение
+   - Пример:
+     ```java
+     Input dynamicField = input("//input[@data-id='%s']")
+         .withName("Dynamic Field")
+         .withTimeout(Duration.ofSeconds(10));
+     
+     dynamicField.withParam("user-123").fill("value");
+     ```
+
+4. **Множественные параметры**
+   - `.withParams(String... params)` для нескольких подстановок
+   - Пример: `button("//button[@data-page='%s'][@data-action='%s']")`
+
+5. **Комбинирование с аннотациями**
+   - В одном Page можно использовать и аннотации, и builder API
+   - Builder API для сложных случаев, аннотации для простых
+   - Пример:
+     ```java
+     @Element(name = "Username", xpath = "//input[@id='username']")
+     Input username;  // простой случай
+     
+     private final Input dynamicField = input("//input[@data-id='%s']")
+         .withName("Dynamic Field");  // сложный случай
+     ```
+
+6. **Примеры использования**
+   - Динамические таблицы
+   - Параметризованные формы
+   - Условные элементы
+   - Медленно загружающиеся элементы
+
+### Technical Notes:
+- Builder возвращает тот же тип элемента (Input, Button, etc.)
+- Параметры применяются при каждом вызове метода элемента
+- Thread-safe - каждый вызов создает новый контекст
+
+---
+
+## Story 3.5: ElementList для работы с коллекциями
+
+**As a** UI developer,  
+**I want** удобный API для работы с коллекциями элементов,  
+**So that** я могу фильтровать, искать и проверять списки элементов.
+
+### Acceptance Criteria:
+
+1. **Класс `ElementList<T extends BaseElement>`**
+   - Обертка над Selenide `ElementsCollection`
+   - Типобезопасная - работает с конкретными типами элементов
+   - Implements `Iterable<T>` для использования в for-each
+
+2. **Методы доступа**
+   - `size()` - количество элементов
+   - `get(int index)` - элемент по индексу
+   - `first()` - первый элемент
+   - `last()` - последний элемент
+   - `isEmpty()` - проверка на пустоту
+
+3. **Функциональные методы**
+   - `filter(Predicate<T> predicate)` - фильтрация, возвращает новый ElementList
+   - `findFirst(Predicate<T> predicate)` - поиск первого, возвращает Optional<T>
+   - `map(Function<T, R> mapper)` - маппинг в Stream<R>
+   - `forEach(Consumer<T> action)` - итерация
+   - `stream()` - получение Stream<T>
+
+4. **Assertions для коллекций**
+   - `shouldHaveSize(int expected)` - проверка размера
+   - `shouldNotBeEmpty()` - проверка что не пустая
+   - `shouldBeEmpty()` - проверка что пустая
+   - Все assertions возвращают this для цепочек
+
+5. **Автоматические Allure steps**
+   - Все операции создают steps: "Filter 'Menu Items'", "Get size of 'Cards'"
+   - Имя коллекции берется из аннотации `@Elements(name = "...")`
+
+6. **Примеры использования**
+   - Фильтрация списка по условию
+   - Поиск элемента с определенным текстом
+   - Получение всех текстов из списка
+   - Проверка количества элементов
+   - Пример:
+     ```java
+     @Elements(name = "Product Cards", xpath = "//div[@class='product']")
+     ElementList<Button> products;
+     
+     // Использование
+     products.shouldHaveSize(10);
+     
+     Button premiumProduct = products
+         .findFirst(p -> p.getText().contains("Premium"))
+         .orElseThrow();
+     
+     List<String> names = products
+         .map(Button::getText)
+         .collect(Collectors.toList());
+     ```
+
+### Technical Notes:
+- Lazy инициализация элементов в коллекции
+- Каждый элемент получает имя вида "CollectionName[index]"
+- Thread-safe операции
+
+---
+
+## Story 3.6: Примеры компонентов в hex-project-samples
+
+**As a** maintainer,  
+**I want** практические примеры компонентов,  
+**So that** команды видят как использовать framework в реальных проектах.
+
+### Acceptance Criteria:
+
+1. **Примеры компонентов (НЕ в hex-core)**
+   - `HeaderComponent` - навигационное меню
+   - `TableComponent` - работа с таблицами
+   - `ModalComponent` - модальные окна
+   - `DatePickerComponent` - выбор даты
+   - Все в `hex-project-samples`, НЕ в `hex-core-ui`
+
+2. **TableComponent с продвинутым API**
+   - Получение заголовков: `getHeaders()`
+   - Поиск колонки: `getColumnIndex(String columnName)`
+   - Поиск строки: `findRow(String columnName, String value)`
+   - Получение значений колонки: `getColumnValues(String columnName)`
+   - Пример:
+     ```java
+     @Component(name = "Users Table", root = "//table[@id='users']")
+     TableComponent usersTable;
+     
+     usersTable.findRow("Email", "john@example.com")
+         .getCell("Status")
+         .shouldHave(text("Active"));
+     ```
+
+3. **ModalComponent с ожиданиями**
+   - Ожидание появления: `waitUntilVisible()`
+   - Ожидание исчезновения: `waitUntilHidden()`
+   - Закрытие: `close()`
+   - Проверка заголовка: `shouldHaveTitle(String title)`
+
+4. **Примеры тестов**
+   - Демонстрация композиции Page + Component
+   - Использование ElementList
+   - Динамические локаторы через Builder API
+   - Бизнес-методы с группировкой steps
+
+5. **README на русском языке**
+   - Описание каждого примера
+   - Как запустить примеры
+   - Объяснение паттернов использования
+   - Best practices
+
+6. **CI интеграция**
+   - Примеры запускаются в headless режиме
+   - Генерируются Allure отчеты
+   - Проверка что все примеры работают
+
+### Technical Notes:
+- Примеры используют реальное приложение (например, PetClinic)
+- Демонстрируют все возможности framework
+- Служат документацией через код
+
+---
+
+## Story 3.7: Расширяемость и кастомные элементы
+
+**As a** framework user,  
+**I want** возможность создавать кастомные элементы,  
+**So that** я могу добавлять специфичные для проекта UI компоненты.
+
+### Acceptance Criteria:
+
+1. **Создание кастомных элементов**
+   - Наследование от `BaseElement`
+   - Добавление специфичных методов
+   - Автоматическое логирование и Allure steps
+   - Пример:
+     ```java
+     public class RichTextEditor extends BaseElement {
+         public RichTextEditor(String name, SelenideElement element) {
+             super(name, element);
+         }
+         
+         @Step("Set HTML content in '{this.name}'")
+         public RichTextEditor setHtmlContent(String html) {
+             logger.info("Setting HTML in '{}' in page '{}' component '{}'",
+                 name, getPageName(), getComponentName());
+             executeScript("arguments[0].innerHTML = arguments[1]", element, html);
+             return this;
+         }
+     }
+     ```
+
+2. **Регистрация в ElementFactory**
+   - Метод `ElementFactory.register(Class, BiFunction)`
+   - Позволяет использовать кастомные элементы с аннотациями
+   - Пример: `ElementFactory.register(RichTextEditor.class, RichTextEditor::new)`
+
+3. **Кастомные Conditions**
+   - Создание специфичных условий для assertions
+   - Наследование от `WebElementCondition`
+   - Пример:
+     ```java
+     public static WebElementCondition hasClass(String className) {
+         return new WebElementCondition("has class '" + className + "'") {
+             @Override
+             public boolean test(WebElement element) {
+                 return element.getAttribute("class").contains(className);
+             }
+         };
+     }
+     ```
+
+4. **Interceptors для расширения функциональности**
+   - Interface `ElementInterceptor` с методами: beforeAction, afterAction, onError
+   - Регистрация через `ElementInterceptorRegistry.register()`
+   - Использование для логирования, метрик, дополнительных проверок
+
+5. **Документация по расширению**
+   - Руководство по созданию кастомных элементов
+   - Примеры кастомных Conditions
+   - Best practices для interceptors
+
+### Technical Notes:
+- Кастомные элементы должны следовать тем же принципам что и базовые
+- Обязательное логирование с контекстом
+- Автоматические Allure steps через `@Step`
+
+---
+
+## Definition of Done
+
+- [ ] Все классы реализованы в `hex-core-ui`
+- [ ] Unit тесты покрывают ≥80% кода
+- [ ] Примеры в `hex-project-samples` работают
+- [ ] README на русском языке с примерами
+- [ ] JavaDoc для всех публичных API
+- [ ] Интеграция с Allure работает корректно
+- [ ] Логирование через SLF4J с полным контекстом
+- [ ] Скриншоты только при ошибках через JUnit 5 lifecycle
+- [ ] CI pipeline запускает примеры headless
+- [ ] Архитектурная документация обновлена
+
+---
+
+## Technical Dependencies
+
+- Java 17+
+- Selenide 7.x
+- JUnit 5
+- Allure 2.x
+- SLF4J + Logback
+- Maven
+
+---
+
+## Non-Goals (Out of Scope)
+
+- ❌ Миграция со старых проектов (это новый проект с нуля)
+- ❌ Поддержка других UI фреймворков кроме Selenide
+- ❌ Конкретные компоненты в `hex-core-ui` (только в samples)
+- ❌ Скриншоты на каждом действии (только при ошибках)
+- ❌ Поддержка старых версий Java (<17)
+
+---
+
+## Success Metrics
+
+- ✅ Сокращение boilerplate кода на ≥40%
+- ✅ Время создания нового Page Object ≤5 минут
+- ✅ Автоматические Allure steps для всех действий
+- ✅ Контекстное логирование (page + component + element)
+- ✅ Thread-safe выполнение тестов
+- ✅ Положительные отзывы от команд-пользователей

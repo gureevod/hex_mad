@@ -25,34 +25,8 @@
 - ✅ **Thread-safe**: без shared state, параллельное выполнение
 - ✅ **Типобезопасность**: конкретные типы элементов (Input, Button, Checkbox)
 
-### Сравнение с текущей реализацией
+### Пример использования
 
-**Было (старый подход):**
-```java
-@Getter
-public class AddOwnerPage extends BasePage<AddOwnerPage> {
-    public HeaderComponent header;
-    
-    @FindBy(xpath = "//*[@id='firstName']")
-    private InputField firstNameField;
-    
-    public static AddOwnerPage get() {
-        return new AddOwnerPage();
-    }
-    
-    @Override
-    public AddOwnerPage checkThatPageLoaded() {
-        return this;
-    }
-    
-    @Override
-    public String getUrl() {
-        return appConfig.getString("front.host") + "/owners/new";
-    }
-}
-```
-
-**Стало (новый подход):**
 ```java
 @Page(url = "/owners/new", title = "Add Owner Page")
 public class AddOwnerPage extends BasePage {
@@ -60,7 +34,10 @@ public class AddOwnerPage extends BasePage {
     @Element(name = "First Name", xpath = "//input[@id='firstName']")
     Input firstName;
     
-    @Component(root = "//nav[@id='header']")
+    @Element(name = "Last Name", xpath = "//input[@id='lastName']")
+    Input lastName;
+    
+    @Component(name = "Header", root = "//nav[@id='header']")
     HeaderComponent header;
     
     @Step("Fill owner form")
@@ -333,13 +310,13 @@ public class HeaderComponent extends BaseComponent {
     @Elements(name = "Navigation Links", xpath = ".//nav//a")
     ElementList<Button> navLinks;
     
-    @Step("Navigate to home")
+    @Step("Navigate to home from '{this.componentName}'")
     public HomePage goHome() {
         homeButton.click();
         return new HomePage();
     }
     
-    @Step("Open profile menu")
+    @Step("Open profile menu in '{this.componentName}'")
     public HeaderComponent openProfileMenu() {
         profileMenu.click();
         return this;
@@ -347,17 +324,19 @@ public class HeaderComponent extends BaseComponent {
 }
 ```
 
+**Примечание:** `this.componentName` автоматически подставляется из аннотации `@Component(name = "...")` на странице.
+
 #### Использование компонента в Page
 ```java
 @Page(url = "/dashboard", title = "Dashboard")
 public class DashboardPage extends BasePage {
     
-    // Компонент с указанием root локатора
-    @Component(root = "//header[@id='main-header']")
+    // Компонент с указанием root локатора и имени
+    @Component(name = "Main Header", root = "//header[@id='main-header']")
     HeaderComponent header;
     
-    // Компонент может быть переиспользован с разными root
-    @Component(root = "//aside[@id='sidebar']")
+    // Компонент может быть переиспользован с разными root и именами
+    @Component(name = "Sidebar Navigation", root = "//aside[@id='sidebar']")
     NavigationComponent sidebar;
     
     public HomePage navigateHome() {
@@ -687,10 +666,9 @@ public abstract class BaseElement {
     
     @Step("Click '{this.name}'")
     public void click() {
-        logger.info("Clicking on '{}'", name);
-        AllureStepHelper.attachScreenshot("Before click");
+        logger.info("Clicking on '{}' in page '{}' component '{}'",
+            name, getPageName(), getComponentName());
         element.click();
-        AllureStepHelper.attachScreenshot("After click");
     }
     
     @Step("'{this.name}' should be {condition}")
@@ -728,7 +706,8 @@ public class Input extends BaseElement {
     
     @Step("Fill '{this.name}' with '{text}'")
     public Input fill(String text) {
-        logger.info("Filling '{}' with '{}'", name, text);
+        logger.info("Filling '{}' with '{}' in page '{}' component '{}'",
+            name, text, getPageName(), getComponentName());
         element.clear();
         element.setValue(text);
         return this;
@@ -844,31 +823,38 @@ public class ElementList<T extends BaseElement> implements Iterable<T> {
 
 ### 1. Автоматическая генерация steps
 
-Каждый метод элемента автоматически оборачивается в Allure step:
+Каждый метод элемента автоматически оборачивается в Allure step с контекстным логированием:
 
 ```java
 public abstract class BaseElement {
     
+    protected final String name;
+    protected final SelenideElement element;
+    protected final Logger logger;
+    protected String pageName;      // устанавливается при инициализации
+    protected String componentName; // устанавливается при инициализации
+    
     @Step("Click '{this.name}'")
     public void click() {
-        executeWithAllure(() -> {
-            element.click();
-        });
+        logger.info("Clicking on '{}' in page '{}' component '{}'",
+            name, pageName, componentName);
+        element.click();
     }
     
-    private void executeWithAllure(Runnable action) {
-        AllureStepHelper.attachScreenshot("Before action");
-        try {
-            action.run();
-            AllureStepHelper.attachScreenshot("After action");
-        } catch (Exception e) {
-            AllureStepHelper.attachScreenshot("Error");
-            AllureStepHelper.attachPageSource();
-            throw e;
-        }
+    protected String getPageName() {
+        return pageName != null ? pageName : "Unknown Page";
+    }
+    
+    protected String getComponentName() {
+        return componentName != null ? componentName : "Root";
     }
 }
 ```
+
+**Важно:** Скриншоты делаются **только при ошибках** через JUnit 5 lifecycle плагин, а не на каждом действии. Это обеспечивает:
+- Меньше накладных расходов на выполнение тестов
+- Более чистые Allure отчеты
+- Скриншоты только там, где они действительно нужны
 
 ### 2. Параметризация steps
 
@@ -896,32 +882,23 @@ public HomePage registerUser(User user) {
 }
 ```
 
-### 4. Скриншоты и attachments
+### 4. Контекстное логирование
+
+Каждое действие с элементом логируется с полным контекстом:
 
 ```java
-public class AllureStepHelper {
-    
-    @Attachment(value = "{name}", type = "image/png")
-    public static byte[] attachScreenshot(String name) {
-        return ((TakesScreenshot) WebDriverRunner.getWebDriver())
-            .getScreenshotAs(OutputType.BYTES);
-    }
-    
-    @Attachment(value = "Page Source", type = "text/html")
-    public static String attachPageSource() {
-        return WebDriverRunner.getWebDriver().getPageSource();
-    }
-    
-    @Attachment(value = "Element Info", type = "application/json")
-    public static String attachElementInfo(SelenideElement element) {
-        return new JSONObject()
-            .put("tagName", element.getTagName())
-            .put("text", element.getText())
-            .put("attributes", element.getAttribute("class"))
-            .toString();
-    }
-}
+// Пример лога
+INFO  - Filling 'First Name' with 'John' in page 'Add Owner Page' component 'Root'
+INFO  - Clicking on 'Submit Button' in page 'Add Owner Page' component 'Root'
+INFO  - Navigate to home from 'Main Header' in page 'Dashboard Page' component 'Main Header'
 ```
+
+Это позволяет:
+- Легко отслеживать, где произошла ошибка
+- Понимать контекст действия (страница + компонент)
+- Быстро находить проблемные места в логах
+
+**Скриншоты и page source** прикрепляются автоматически через JUnit 5 lifecycle listener при падении теста.
 
 ---
 
@@ -1049,8 +1026,9 @@ public class LoggingInterceptor implements ElementInterceptor {
     
     @Override
     public void onError(BaseElement element, String action, Exception e) {
-        logger.error("Error during {}: {}", action, element.getName(), e);
-        AllureStepHelper.attachScreenshot("Error");
+        logger.error("Error during {} on '{}' in page '{}' component '{}': {}",
+            action, element.getName(), element.getPageName(),
+            element.getComponentName(), e.getMessage(), e);
     }
 }
 
@@ -1061,96 +1039,27 @@ ElementInterceptorRegistry.register(new MetricsInterceptor());
 
 ---
 
-## Миграция и совместимость
-
-### Стратегия миграции
-
-Поскольку это **новый проект с нуля**, миграция не требуется. Однако архитектура спроектирована так, чтобы при необходимости можно было:
-
-1. **Постепенно мигрировать** существующие Page Objects
-2. **Сосуществовать** со старым кодом в переходный период
-3. **Переиспользовать** существующие Selenide элементы
-
-### Пример совместимости
-
-```java
-// Старый подход (если нужна совместимость)
-public class LegacyPage {
-    @FindBy(xpath = "//input[@id='username']")
-    private SelenideElement usernameElement;
-    
-    public void fillUsername(String username) {
-        usernameElement.setValue(username);
-    }
-}
-
-// Новый подход
-@Page(url = "/login")
-public class ModernLoginPage extends BasePage {
-    @Element(name = "Username", xpath = "//input[@id='username']")
-    Input username;
-    
-    public void fillUsername(String user) {
-        username.fill(user);
-    }
-}
-
-// Гибридный подход (переходный период)
-public class HybridPage extends BasePage {
-    // Новый стиль
-    @Element(name = "Email", xpath = "//input[@id='email']")
-    Input email;
-    
-    // Старый стиль (прямой доступ к Selenide)
-    private SelenideElement legacyElement = $("//div[@id='legacy']");
-    
-    public void useBoth() {
-        email.fill("test@example.com");  // новый API
-        legacyElement.click();           // старый API
-    }
-}
-```
-
----
-
 ## Преимущества нового дизайна
 
 ### 1. Минимум boilerplate кода
 
-**Было:**
-```java
-public class OldPage {
-    @FindBy(xpath = "//input[@id='name']")
-    private InputField nameField;
-    
-    public OldPage() {
-        PageFactory.initElements(this);
-    }
-    
-    public static OldPage get() {
-        return new OldPage();
-    }
-    
-    @Step("Fill name")
-    public void fillName(String name) {
-        nameField.setText(name);
-    }
-}
-```
+Декларативный подход с аннотациями значительно сокращает количество кода:
 
-**Стало:**
 ```java
-@Page(url = "/form")
-public class NewPage extends BasePage {
+@Page(url = "/form", title = "Form Page")
+public class FormPage extends BasePage {
     @Element(name = "Name", xpath = "//input[@id='name']")
     Input name;
     
-    // fillName не нужен - используем напрямую:
-    // page.name.fill("John");
+    @Element(name = "Email", xpath = "//input[@id='email']")
+    Input email;
+    
+    @Component(name = "Header", root = "//header")
+    HeaderComponent header;
 }
 ```
 
-**Экономия:** ~40% кода
+**Экономия:** ~40-50% кода по сравнению с традиционным подходом
 
 ### 2. Автоматические Allure steps
 
@@ -1209,20 +1118,21 @@ modal.closeButton.click();          // Элемент инициализируе
 
 ---
 
-## Сравнительная таблица
+## Ключевые особенности
 
-| Аспект | Старый подход | Новый подход |
-|--------|---------------|--------------|
-| **Boilerplate код** | Высокий (конструкторы, factory методы, @Step на каждом методе) | Минимальный (только аннотации) |
-| **Allure steps** | Вручную через @Step | Автоматически |
-| **Типизация** | Interface + Impl | Конкретные классы |
-| **Инициализация** | Eager (в конструкторе) | Lazy (при обращении) |
-| **Fluent API** | Нет | Да |
-| **Коллекции** | Нет встроенной поддержки | ElementList с filter/map/find |
-| **Динамические локаторы** | Сложно | Builder API |
-| **Кастомизация** | @ElementImpl аннотация | Builder API + расширение |
-| **Читаемость** | Средняя | Высокая |
-| **Поддержка** | Требует знания reflection | Прозрачная архитектура |
+| Аспект | Реализация |
+|--------|------------|
+| **Boilerplate код** | Минимальный - только аннотации |
+| **Allure steps** | Автоматически с контекстным логированием |
+| **Типизация** | Конкретные классы (Input, Button, Checkbox, Select) |
+| **Инициализация** | Lazy через Proxy (при первом обращении) |
+| **Fluent API** | Да - цепочки вызовов |
+| **Коллекции** | ElementList<T> с filter/map/find |
+| **Динамические локаторы** | Builder API с параметрами |
+| **Кастомизация** | Builder API + расширение через наследование |
+| **Логирование** | SLF4J с полным контекстом (page + component + element) |
+| **Скриншоты** | Только при ошибках через JUnit 5 lifecycle |
+| **Thread-Safety** | Да - lazy инициализация без shared state |
 
 ---
 
@@ -1247,10 +1157,10 @@ modal.closeButton.click();          // Элемент инициализируе
 - [ ] Кастомизация timeout/retry/polling
 
 ### Phase 4: Allure Integration (Epic 3.4)
-- [ ] Автоматическая генерация steps
-- [ ] Скриншоты на каждом действии
-- [ ] Параметризация step names
-- [ ] Attachments (page source, element info)
+- [ ] Автоматическая генерация steps с контекстом
+- [ ] Параметризация step names (page + component + element)
+- [ ] Контекстное логирование через SLF4J
+- [ ] Интеграция с JUnit 5 lifecycle для скриншотов при ошибках
 
 ### Phase 5: Advanced Features (Epic 3.5)
 - [ ] Кастомные элементы (RichTextEditor, DatePicker, etc.)
