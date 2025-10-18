@@ -4,6 +4,12 @@
 
 Примеры использования Hex Automation Framework. Демонстрирует интеграцию всех модулей фреймворка в реальном проекте.
 
+## 📚 Документация
+
+- **[Page Objects - Подробное руководство](README_PAGE_OBJECTS.md)** - Полное руководство по созданию Page Objects с примерами
+- [Архитектурная документация](../docs/architecture/ui-declerative-design.md)
+- [Epic 3: UI Wrappers](../docs/prd/epic-3-ui-wrappers-and-composite-component-pattern.md)
+
 ## Структура проекта
 
 ### API (api)
@@ -11,8 +17,14 @@
 - **services/** - Сервисы для работы с API
 
 ### Страницы (pages)
-- Page Object классы для UI тестирования
-- Примеры: [`LoginPage`](src/main/java/com/company/hex/project/pages/LoginPage.java), [`HomePage`](src/main/java/com/company/hex/project/pages/HomePage.java), [`DashboardPage`](src/main/java/com/company/hex/project/pages/DashboardPage.java)
+- Page Object классы для UI тестирования с декларативным API
+- Примеры:
+  - [`LoginPage`](src/main/java/com/company/hex/project/pages/LoginPage.java) - простой Page Object с формой логина
+  - [`HomePage`](src/main/java/com/company/hex/project/pages/HomePage.java) - домашняя страница с навигацией
+  - [`DashboardPage`](src/main/java/com/company/hex/project/pages/DashboardPage.java) - страница с компонентами
+  - [`AddOwnerPage`](src/main/java/com/company/hex/project/pages/AddOwnerPage.java) - форма с бизнес-методами
+  - [`UserProfilePage`](src/main/java/com/company/hex/project/pages/UserProfilePage.java) - профиль с вкладками
+  - [`ForgotPasswordPage`](src/main/java/com/company/hex/project/pages/ForgotPasswordPage.java) - восстановление пароля
 
 ### Компоненты (components)
 - Переиспользуемые UI компоненты с гибким scoping
@@ -22,8 +34,10 @@
 - Настройки проекта и окружений
 
 ### Тесты (tests)
-- **api/** - API тесты
-- **ui/** - UI тесты
+- **api/** - API тесты с декларативным и императивным подходами
+- **ui/** - UI тесты с примерами использования Page Objects
+  - [`PageObjectExamplesTest`](src/test/java/com/company/hex/project/tests/ui/PageObjectExamplesTest.java) - 10 примеров использования
+  - [`ComponentScopingTest`](src/test/java/com/company/hex/project/tests/ui/ComponentScopingTest.java) - примеры с компонентами
 
 ## Зависимости
 
@@ -44,6 +58,48 @@ mvn test -Dtest="**/*ApiTest"
 # Запуск только UI тестов
 mvn test -Dtest="**/*UiTest"
 ```
+
+## Быстрый старт
+
+### Создание простого Page Object
+
+```java
+@Page(url = "/login", title = "Login Page")
+public class LoginPage extends BasePage {
+    
+    @Element(name = "Username", xpath = "//input[@id='username']")
+    Input username;
+    
+    @Element(name = "Password", xpath = "//input[@id='password']")
+    Input password;
+    
+    @Element(name = "Login Button", xpath = "//button[@type='submit']")
+    Button loginButton;
+    
+    @Step("Вход как {user}")
+    public HomePage login(String user, String pass) {
+        username.fill(user);
+        password.fill(pass);
+        loginButton.click();
+        return new HomePage();
+    }
+}
+```
+
+### Использование в тесте
+
+```java
+@Test
+public void testLogin() {
+    LoginPage loginPage = new LoginPage();
+    loginPage.open();
+    HomePage homePage = loginPage.login("user@example.com", "password123");
+    
+    homePage.verifyWelcomeMessage("Welcome, User!");
+}
+```
+
+**Подробнее:** [README_PAGE_OBJECTS.md](README_PAGE_OBJECTS.md)
 
 ## Примеры использования
 
