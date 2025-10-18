@@ -1,7 +1,9 @@
 package com.company.hex.ui.factory;
 
+import com.company.hex.ui.annotations.Component;
 import com.company.hex.ui.annotations.Element;
 import com.company.hex.ui.annotations.Elements;
+import com.company.hex.ui.core.BaseComponent;
 import com.company.hex.ui.core.BaseElement;
 import com.company.hex.ui.proxy.LazyElementHandler;
 import org.slf4j.Logger;
@@ -66,6 +68,9 @@ public class FieldInitializer {
                 initializedCount++;
             } else if (field.isAnnotationPresent(Elements.class)) {
                 initializeElementList(target, field, pageName, componentName, componentRoot);
+                initializedCount++;
+            } else if (field.isAnnotationPresent(Component.class)) {
+                initializeComponent(target, field, pageName);
                 initializedCount++;
             }
         }
@@ -179,6 +184,65 @@ public class FieldInitializer {
         
         // TODO: Реализация ElementList будет добавлена позже
         logger.warn("Инициализация @Elements для поля '{}' пока не реализована", field.getName());
+    }
+    
+    /**
+     * Инициализировать поле с аннотацией @Component.
+     *
+     * @param target объект
+     * @param field поле
+     * @param pageName имя страницы
+     */
+    private static void initializeComponent(
+            Object target,
+            Field field,
+            String pageName) {
+        
+        Component annotation = field.getAnnotation(Component.class);
+        String componentName = annotation.name();
+        String componentRoot = annotation.root();
+        
+        // Валидация
+        if (componentName == null || componentName.trim().isEmpty()) {
+            throw new IllegalArgumentException(
+                    String.format("Поле '%s' в классе '%s' имеет пустое имя в аннотации @Component",
+                            field.getName(), target.getClass().getName()));
+        }
+        
+        if (componentRoot == null || componentRoot.trim().isEmpty()) {
+            throw new IllegalArgumentException(
+                    String.format("Поле '%s' в классе '%s' должно иметь root локатор в аннотации @Component",
+                            field.getName(), target.getClass().getName()));
+        }
+        
+        // Проверяем что поле имеет тип BaseComponent
+        Class<?> componentType = field.getType();
+        if (!BaseComponent.class.isAssignableFrom(componentType)) {
+            throw new IllegalArgumentException(
+                    String.format("Поле '%s' в классе '%s' должно быть типа BaseComponent или его наследника",
+                            field.getName(), target.getClass().getName()));
+        }
+        
+        try {
+            // Создаем экземпляр компонента
+            BaseComponent component = (BaseComponent) componentType.getDeclaredConstructor().newInstance();
+            
+            // Инициализируем компонент с контекстом
+            component.initialize(componentName, componentRoot, pageName);
+            
+            // Устанавливаем компонент в поле
+            setField(field, target, component);
+            
+            logger.debug("Компонент '{}' типа {} успешно инициализирован в поле '{}'",
+                    componentName, componentType.getSimpleName(), field.getName());
+            
+        } catch (Exception e) {
+            String errorMessage = String.format(
+                    "Ошибка при создании компонента '%s' типа %s: %s",
+                    componentName, componentType.getName(), e.getMessage());
+            logger.error(errorMessage, e);
+            throw new RuntimeException(errorMessage, e);
+        }
     }
     
     /**
