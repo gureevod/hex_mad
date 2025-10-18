@@ -2,6 +2,7 @@ package com.company.hex.ui.factory;
 
 import com.codeborne.selenide.SelenideElement;
 import com.company.hex.ui.core.BaseElement;
+import com.company.hex.ui.core.UiContext;
 import com.company.hex.ui.elements.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +50,7 @@ public class ElementFactory {
     
     /**
      * Создать элемент указанного типа.
-     * 
+     *
      * @param <T> тип элемента
      * @param elementType класс элемента
      * @param name имя элемента
@@ -86,6 +87,33 @@ public class ElementFactory {
         logger.debug("Создание элемента типа {} с именем '{}'", elementType.getSimpleName(), name);
         T element = (T) creator.apply(name, selenideElement);
         logger.trace("Элемент '{}' типа {} успешно создан", name, elementType.getSimpleName());
+        
+        return element;
+    }
+    
+    /**
+     * Создать элемент указанного типа с контекстом.
+     *
+     * @param <T> тип элемента
+     * @param elementType класс элемента
+     * @param name имя элемента
+     * @param selenideElement Selenide элемент
+     * @param context контекст UI (страница + компонент)
+     * @return созданный элемент с установленным контекстом
+     * @throws IllegalArgumentException если тип элемента не зарегистрирован
+     */
+    public static <T extends BaseElement> T create(
+            Class<T> elementType,
+            String name,
+            SelenideElement selenideElement,
+            UiContext context) {
+        
+        T element = create(elementType, name, selenideElement);
+        
+        if (context != null) {
+            element.setPageName(context.getPageName());
+            element.setComponentName(context.getComponentName());
+        }
         
         return element;
     }

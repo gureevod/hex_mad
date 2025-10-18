@@ -1,10 +1,13 @@
 package com.company.hex.ui.factory;
 
+import com.codeborne.selenide.ElementsCollection;
 import com.company.hex.ui.annotations.Component;
 import com.company.hex.ui.annotations.Element;
 import com.company.hex.ui.annotations.Elements;
+import com.company.hex.ui.collections.ElementList;
 import com.company.hex.ui.core.BaseComponent;
 import com.company.hex.ui.core.BaseElement;
+import com.company.hex.ui.core.UiContext;
 import com.company.hex.ui.proxy.LazyElementHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +18,10 @@ import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
+
+import static com.codeborne.selenide.Selenide.$$;
+import static com.codeborne.selenide.Selenide.$$x;
 
 /**
  * Утилитный класс для инициализации полей с аннотациями @Element и @Elements.
@@ -166,13 +173,14 @@ public class FieldInitializer {
     
     /**
      * Инициализировать поле с аннотацией @Elements.
-     * 
+     *
      * @param target объект
      * @param field поле
      * @param pageName имя страницы
      * @param componentName имя компонента
      * @param componentRoot корневой локатор компонента
      */
+    @SuppressWarnings("unchecked")
     private static void initializeElementList(
             Object target,
             Field field,
@@ -181,9 +189,82 @@ public class FieldInitializer {
             String componentRoot) {
         
         Elements annotation = field.getAnnotation(Elements.class);
+        String name = annotation.name();
         
-        // TODO: Реализация ElementList будет добавлена позже
-        logger.warn("Инициализация @Elements для поля '{}' пока не реализована", field.getName());
+        // Валидация
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException(
+                    String.format("Поле '%s' в классе '%s' имеет пустое имя в аннотации @Elements",
+                            field.getName(), target.getClass().getName()));
+        }
+        
+        String xpath = annotation.xpath();
+        String css = annotation.css();
+        
+        if ((xpath == null || xpath.trim().isEmpty()) && (css == null || css.trim().isEmpty())) {
+            throw new IllegalArgumentException(
+                    String.format("Поле '%s' в классе '%s' должно иметь xpath или css локатор",
+                            field.getName(), target.getClass().getName()));
+        }
+        
+        // Определяем тип локатора и сам локатор
+        boolean isXpath = xpath != null && !xpath.trim().isEmpty();
+        String locator = isXpath ? xpath : css;
+        
+        // Получаем тип элемента из generic параметра
+        Class<? extends BaseElement> elementType = getElementTypeFromList(field);
+        
+        // Создаем контекст
+        UiContext context = new UiContext(pageName, componentName);
+        
+        // Создаем resolver для коллекции
+        Supplier<ElementsCollection> resolver = createCollectionResolver(locator, isXpath, componentRoot);
+        
+        // Создаем ElementList
+        ElementList<?> elementList = new ElementList<>(name, resolver, elementType, context);
+        
+        // Устанавливаем в поле
+        setField(field, target, elementList);
+        
+        logger.trace("Поле '{}' инициализировано как ElementList<{}> с именем '{}'",
+                field.getName(), elementType.getSimpleName(), name);
+    }
+    
+    /**
+     * Создать resolver для коллекции элементов.
+     *
+     * @param locator локатор
+     * @param isXpath true если xpath
+     * @param componentRoot корневой локатор компонента
+     * @return Supplier для ElementsCollection
+     */
+    private static Supplier<ElementsCollection> createCollectionResolver(
+            String locator,
+            boolean isXpath,
+            String componentRoot) {
+        
+        return () -> {
+            if (componentRoot != null && !componentRoot.trim().isEmpty()) {
+                // Если есть root компонента, комбинируем локаторы
+                String fullLocator;
+                if (isXpath) {
+                    // Для xpath комбинируем: root + относительный локатор
+                    fullLocator = componentRoot + locator;
+                    return $$x(fullLocator);
+                } else {
+                    // Для CSS используем пространство для вложенности
+                    fullLocator = componentRoot + " " + locator;
+                    return $$(fullLocator);
+                }
+            } else {
+                // Иначе ищем от корня документа
+                if (isXpath) {
+                    return $$x(locator);
+                } else {
+                    return $$(locator);
+                }
+            }
+        };
     }
     
     /**
