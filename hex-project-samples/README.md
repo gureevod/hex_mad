@@ -7,6 +7,7 @@
 ## 📚 Документация
 
 - **[Page Objects - Подробное руководство](README_PAGE_OBJECTS.md)** - Полное руководство по созданию Page Objects с примерами
+- **[Builder API для динамических локаторов](README_BUILDER_API.md)** - Руководство по использованию Builder API для сложных случаев
 - [Архитектурная документация](../docs/architecture/ui-declerative-design.md)
 - [Epic 3: UI Wrappers](../docs/prd/epic-3-ui-wrappers-and-composite-component-pattern.md)
 
@@ -25,6 +26,7 @@
   - [`AddOwnerPage`](src/main/java/com/company/hex/project/pages/AddOwnerPage.java) - форма с бизнес-методами
   - [`UserProfilePage`](src/main/java/com/company/hex/project/pages/UserProfilePage.java) - профиль с вкладками
   - [`ForgotPasswordPage`](src/main/java/com/company/hex/project/pages/ForgotPasswordPage.java) - восстановление пароля
+  - [`AdvancedFormPage`](src/main/java/com/company/hex/project/pages/AdvancedFormPage.java) - примеры Builder API с динамическими локаторами
 
 ### Компоненты (components)
 - Переиспользуемые UI компоненты с гибким scoping
@@ -38,6 +40,7 @@
 - **ui/** - UI тесты с примерами использования Page Objects
   - [`PageObjectExamplesTest`](src/test/java/com/company/hex/project/tests/ui/PageObjectExamplesTest.java) - 10 примеров использования
   - [`ComponentScopingTest`](src/test/java/com/company/hex/project/tests/ui/ComponentScopingTest.java) - примеры с компонентами
+  - [`BuilderApiExamplesTest`](src/test/java/com/company/hex/project/tests/ui/BuilderApiExamplesTest.java) - 8 примеров Builder API
 
 ## Зависимости
 
