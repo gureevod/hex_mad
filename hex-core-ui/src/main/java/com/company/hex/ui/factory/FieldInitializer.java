@@ -1,6 +1,7 @@
 package com.company.hex.ui.factory;
 
 import com.codeborne.selenide.ElementsCollection;
+import com.codeborne.selenide.SelenideElement;
 import com.company.hex.ui.annotations.Component;
 import com.company.hex.ui.annotations.Element;
 import com.company.hex.ui.annotations.Elements;
@@ -8,18 +9,17 @@ import com.company.hex.ui.collections.ElementList;
 import com.company.hex.ui.core.BaseComponent;
 import com.company.hex.ui.core.BaseElement;
 import com.company.hex.ui.core.UiContext;
-import com.company.hex.ui.proxy.LazyElementHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
+import static com.codeborne.selenide.Selenide.$;
 import static com.codeborne.selenide.Selenide.$$;
 import static com.codeborne.selenide.Selenide.$$x;
 
@@ -107,7 +107,7 @@ public class FieldInitializer {
     
     /**
      * Инициализировать поле с аннотацией @Element.
-     * 
+     *
      * @param target объект
      * @param field поле
      * @param pageName имя страницы
@@ -154,8 +154,8 @@ public class FieldInitializer {
                             field.getName(), target.getClass().getName()));
         }
         
-        // Создаем lazy proxy
-        Object proxy = createLazyProxy(
+        // Создаем элемент напрямую (Selenide уже обеспечивает lazy resolution)
+        BaseElement element = createElementDirectly(
                 elementType,
                 name,
                 locator,
@@ -164,8 +164,8 @@ public class FieldInitializer {
                 pageName,
                 componentName);
         
-        // Устанавливаем proxy в поле
-        setField(field, target, proxy);
+        // Устанавливаем элемент в поле
+        setField(field, target, element);
         
         logger.trace("Поле '{}' инициализировано как {} с именем '{}'",
                 field.getName(), elementType.getSimpleName(), name);
@@ -327,8 +327,9 @@ public class FieldInitializer {
     }
     
     /**
-     * Создать lazy proxy для элемента.
-     * 
+     * Создать элемент напрямую без использования proxy.
+     * Selenide уже обеспечивает lazy resolution элементов.
+     *
      * @param elementType тип элемента
      * @param name имя элемента
      * @param locator локатор
@@ -336,10 +337,9 @@ public class FieldInitializer {
      * @param componentRoot корневой локатор компонента
      * @param pageName имя страницы
      * @param componentName имя компонента
-     * @return proxy объект
+     * @return созданный элемент
      */
-    @SuppressWarnings("unchecked")
-    private static <T extends BaseElement> T createLazyProxy(
+    private static <T extends BaseElement> T createElementDirectly(
             Class<T> elementType,
             String name,
             String locator,
@@ -348,19 +348,71 @@ public class FieldInitializer {
             String pageName,
             String componentName) {
         
-        LazyElementHandler handler = new LazyElementHandler(
-                elementType,
-                name,
-                locator,
-                isXpath,
-                componentRoot,
-                pageName,
-                componentName);
+        try {
+            // Строим полный локатор
+            String fullLocator = buildFullLocator(locator, isXpath, componentRoot);
+            
+            // Находим SelenideElement (lazy по умолчанию в Selenide)
+            SelenideElement selenideElement;
+            if (isXpath) {
+                selenideElement = $(org.openqa.selenium.By.xpath(fullLocator));
+            } else {
+                selenideElement = $(org.openqa.selenium.By.cssSelector(fullLocator));
+            }
+            
+            // Создаем элемент через фабрику
+            T element = ElementFactory.create(elementType, name, selenideElement);
+            
+            // Устанавливаем контекст
+            if (pageName != null) {
+                element.setPageName(pageName);
+            }
+            if (componentName != null) {
+                element.setComponentName(componentName);
+            }
+            
+            logger.debug("Элемент '{}' типа {} успешно создан", name, elementType.getSimpleName());
+            return element;
+            
+        } catch (Exception e) {
+            String errorMessage = String.format(
+                    "Ошибка при создании элемента '%s' типа %s с локатором '%s'",
+                    name, elementType.getSimpleName(), locator);
+            logger.error(errorMessage, e);
+            throw new RuntimeException(errorMessage, e);
+        }
+    }
+    
+    /**
+     * Построить полный локатор с учетом componentRoot.
+     *
+     * @param locator базовый локатор
+     * @param isXpath true если xpath
+     * @param componentRoot корневой локатор компонента
+     * @return полный локатор
+     */
+    private static String buildFullLocator(String locator, boolean isXpath, String componentRoot) {
+        if (componentRoot == null || componentRoot.trim().isEmpty()) {
+            return locator;
+        }
         
-        return (T) Proxy.newProxyInstance(
-                elementType.getClassLoader(),
-                new Class<?>[]{elementType},
-                handler);
+        // Если элемент внутри компонента, комбинируем локаторы
+        if (isXpath) {
+            // Для xpath: componentRoot + относительный локатор
+            if (locator.startsWith(".//")) {
+                // Относительный локатор - добавляем к root
+                return componentRoot + "/" + locator.substring(3);
+            } else if (locator.startsWith("//")) {
+                // Абсолютный локатор - используем как есть
+                return locator;
+            } else {
+                // Локатор без префикса - делаем относительным
+                return componentRoot + "//" + locator;
+            }
+        } else {
+            // Для CSS: используем вложенность через пробел
+            return componentRoot + " " + locator;
+        }
     }
     
     /**

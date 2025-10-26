@@ -17,6 +17,7 @@ public class UitestingplaygroundTest {
     @Severity(SeverityLevel.CRITICAL)
     public void testSuccessfulLogin() {
         SamplePage page = new SamplePage();
+        page.open();
         page.username.fill("user");
         page.password.fill("pwd");
         page.loginButton.click();
