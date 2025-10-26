@@ -2,11 +2,15 @@ package com.company.hex.ui.core;
 
 import com.company.hex.ui.annotations.Page;
 import com.company.hex.ui.factory.FieldInitializer;
+import com.company.hex.ui.config.UiConfig;
+import com.company.hex.core.config.HexConfigFactory;
+import com.codeborne.selenide.Configuration;
 import com.codeborne.selenide.Selenide;
 import com.codeborne.selenide.WebDriverRunner;
 import com.company.hex.core.logging.HexLoggerFactory;
 import io.qameta.allure.Step;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.codeborne.selenide.Selenide.open;
 
@@ -46,6 +50,8 @@ import static com.codeborne.selenide.Selenide.open;
  */
 public abstract class BasePage {
     
+    private static volatile boolean selenideConfigured = false;
+    
     protected final Logger logger;
     protected final String pageName;
     protected final String pageUrl;
@@ -57,6 +63,9 @@ public abstract class BasePage {
      */
     protected BasePage() {
         this.logger = HexLoggerFactory.getUiLogger(getClass());
+        
+        // Инициализируем Selenide конфигурацию из hex.properties (один раз)
+        ensureSelenideConfigured();
         
         // Получаем информацию из аннотации @Page
         Page pageAnnotation = getClass().getAnnotation(Page.class);
@@ -77,6 +86,34 @@ public abstract class BasePage {
         FieldInitializer.initializeFields(this, pageName, null, null);
         
         logger.info("Page Object '{}' успешно создан", pageName);
+    }
+    
+    /**
+     * Гарантировать, что Selenide сконфигурирован из hex.properties.
+     * Использует существующий метод configureSelenide() из WebDriverFactory.
+     */
+    private static void ensureSelenideConfigured() {
+        if (!selenideConfigured) {
+            synchronized (BasePage.class) {
+                if (!selenideConfigured) {
+                    try {
+                        UiConfig config = HexConfigFactory.getConfig(UiConfig.class);
+                        // Вызываем существующий статический метод из WebDriverFactory
+                        WebDriverFactory.configureSelenide(config);
+                        selenideConfigured = true;
+                        
+                        LoggerFactory.getLogger(BasePage.class).info(
+                            "Selenide сконфигурирован: baseUrl={}, browser={}, headless={}",
+                            Configuration.baseUrl, Configuration.browser, Configuration.headless
+                        );
+                    } catch (Exception e) {
+                        LoggerFactory.getLogger(BasePage.class).warn(
+                            "Не удалось сконфигурировать Selenide из hex.properties", e
+                        );
+                    }
+                }
+            }
+        }
     }
     
     /**

@@ -317,10 +317,11 @@ public final class WebDriverFactory {
 
     /**
      * Настроить Selenide конфигурацию.
-     * 
+     * Метод доступен для использования из BasePage для инициализации конфигурации.
+     *
      * @param config конфигурация UI
      */
-    private static void configureSelenide(UiConfig config) {
+    static void configureSelenide(UiConfig config) {
         Configuration.browser = config.browser();
         Configuration.headless = config.headless();
         Configuration.browserSize = config.windowWidth() + "x" + config.windowHeight();
