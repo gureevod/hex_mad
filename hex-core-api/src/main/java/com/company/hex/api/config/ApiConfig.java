@@ -12,10 +12,12 @@ import org.aeonbits.owner.Config;
  */
 @Config.LoadPolicy(Config.LoadType.MERGE)
 @Config.Sources({
+    "classpath:META-INF/hex-defaults.properties",
     "classpath:hex.properties",
+    "classpath:hex-${hex.environment}.properties",
     "classpath:hex-${env}.properties",
-    "system:properties",
-    "system:env"
+    "system:env",
+    "system:properties"
 })
 public interface ApiConfig extends BaseConfig {
 
