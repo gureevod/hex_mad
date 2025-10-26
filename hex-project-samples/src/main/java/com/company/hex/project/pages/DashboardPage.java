@@ -45,7 +45,7 @@ public class DashboardPage extends BasePage {
     @Element(name = "Welcome Message", xpath = "//h1[@class='welcome']")
     public TextElement welcomeMessage;
     
-    @Element(name = "User Avatar", xpath = "//img[@class='user-avatar']")
+    @Element(name = "Аватар", xpath = "//img[@class='user-avatar']")
     public TextElement userAvatar;
     
     @Element(name = "Notifications Button", xpath = "//button[@id='notifications']")

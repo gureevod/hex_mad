@@ -5,6 +5,8 @@ import io.qameta.allure.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Примеры тестов, демонстрирующих использование Page Objects с декларативным API.
@@ -27,7 +29,9 @@ import org.junit.jupiter.api.Test;
 @Tag("ui")
 @Tag("examples")
 public class PageObjectExamplesTest {
-    
+
+    private static final Logger log = LoggerFactory.getLogger(PageObjectExamplesTest.class);
+
     /**
      * Пример 1: Простой тест логина с минимальным кодом.
      * Демонстрирует автоматические Allure steps для каждого действия.
@@ -41,12 +45,11 @@ public class PageObjectExamplesTest {
         // Открываем страницу логина и выполняем вход
         // Каждое действие автоматически создает Allure step
         LoginPage loginPage = new LoginPage();
-        loginPage.open();                                  // Step: Открыть страницу 'Login Page'
+        loginPage.open();                              // Step: Открыть страницу 'Login Page'
         HomePage homePage = loginPage.login("user@example.com", "password123"); // Step: Вход как user@example.com
                                                           //   └─ Fill 'Username' with 'user@example.com'
                                                           //   └─ Fill 'Password' with '******'
                                                           //   └─ Click 'Login Button'
-        
         // Проверяем что попали на домашнюю страницу
         homePage.verifyWelcomeMessage("Welcome, User!");  // Step: Проверить приветственное сообщение
         homePage.verifyPageLoaded();                      // Step: Проверить отображение элементов

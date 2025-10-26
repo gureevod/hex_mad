@@ -20,20 +20,20 @@ import static com.codeborne.selenide.Condition.visible;
 @Page(url = "/login", title = "Login Page")
 public class LoginPage extends BasePage {
     
-    @Element(name = "Username", xpath = "//input[@id='username']")
-    Input username;
+    @Element(name = "Юзернейм", xpath = "//input[@id='username']")
+    public Input username;
     
-    @Element(name = "Password", xpath = "//input[@id='password']")
-    Input password;
+    @Element(name = "Пароль", xpath = "//input[@id='password']")
+    public Input password;
     
-    @Element(name = "Login Button", xpath = "//button[@type='submit']")
-    Button loginButton;
+    @Element(name = "Кнопка Логин", xpath = "//button[@type='submit']")
+    public Button loginButton;
     
-    @Element(name = "Error Message", xpath = "//div[@class='error-message']")
-    TextElement errorMessage;
+    @Element(name = "Поле текста ошибки", xpath = "//div[@class='error-message']")
+    public TextElement errorMessage;
     
-    @Element(name = "Forgot Password Link", xpath = "//a[contains(text(), 'Forgot')]")
-    Button forgotPasswordLink;
+    @Element(name = "Кнопка 'Забыли пароль'", xpath = "//a[contains(text(), 'Forgot')]")
+    public Button forgotPasswordLink;
     
     /**
      * Выполнить вход с указанными учетными данными.

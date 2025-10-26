@@ -652,67 +652,7 @@ Out of Scope
 
 ---
 
-## Story 3.6: Примеры компонентов в hex-project-samples
-
-**As a** maintainer,  
-**I want** практические примеры компонентов,  
-**So that** команды видят как использовать framework в реальных проектах.
-
-### Acceptance Criteria:
-
-1. **Примеры компонентов (НЕ в hex-core)**
-   - `HeaderComponent` - навигационное меню
-   - `TableComponent` - работа с таблицами
-   - `ModalComponent` - модальные окна
-   - `DatePickerComponent` - выбор даты
-   - Все в `hex-project-samples`, НЕ в `hex-core-ui`
-
-2. **TableComponent с продвинутым API**
-   - Получение заголовков: `getHeaders()`
-   - Поиск колонки: `getColumnIndex(String columnName)`
-   - Поиск строки: `findRow(String columnName, String value)`
-   - Получение значений колонки: `getColumnValues(String columnName)`
-   - Пример:
-     ```java
-     @Component(name = "Users Table", root = "//table[@id='users']")
-     TableComponent usersTable;
-     
-     usersTable.findRow("Email", "john@example.com")
-         .getCell("Status")
-         .shouldHave(text("Active"));
-     ```
-
-3. **ModalComponent с ожиданиями**
-   - Ожидание появления: `waitUntilVisible()`
-   - Ожидание исчезновения: `waitUntilHidden()`
-   - Закрытие: `close()`
-   - Проверка заголовка: `shouldHaveTitle(String title)`
-
-4. **Примеры тестов**
-   - Демонстрация композиции Page + Component
-   - Использование ElementList
-   - Динамические локаторы через Builder API
-   - Бизнес-методы с группировкой steps
-
-5. **README на русском языке**
-   - Описание каждого примера
-   - Как запустить примеры
-   - Объяснение паттернов использования
-   - Best practices
-
-6. **CI интеграция**
-   - Примеры запускаются в headless режиме
-   - Генерируются Allure отчеты
-   - Проверка что все примеры работают
-
-### Technical Notes:
-- Примеры используют реальное приложение (например, PetClinic)
-- Демонстрируют все возможности framework
-- Служат документацией через код
-
----
-
-## Story 3.7: Расширяемость и кастомные элементы
+## Story 3.6: Расширяемость и кастомные элементы
 
 **As a** framework user,  
 **I want** возможность создавать кастомные элементы,  
@@ -822,3 +762,6 @@ Out of Scope
 - ✅ Контекстное логирование (page + component + element)
 - ✅ Thread-safe выполнение тестов
 - ✅ Положительные отзывы от команд-пользователей
+
+TODO: динамические url-ы
+TODO: RU плагин для автокомплита
