@@ -63,21 +63,27 @@ class LombokAnnotator extends Jackson2Annotator {
         }
         
         try {
-            // Add @Data (or individual annotations)
-            // Using individual annotations for better control
-            clazz.annotate(clazz.owner().ref("lombok.Getter"));
-            clazz.annotate(clazz.owner().ref("lombok.Setter"));
+            // Use @Data for compact output (includes @Getter, @Setter, @ToString, @EqualsAndHashCode, @RequiredArgsConstructor)
+            // Note: @Data respects includeHashcodeAndEquals and includeToString settings
+            if (includeHashcodeAndEquals && includeToString) {
+                clazz.annotate(clazz.owner().ref("lombok.Data"));
+            } else {
+                // If not using default settings, add annotations individually
+                clazz.annotate(clazz.owner().ref("lombok.Getter"));
+                clazz.annotate(clazz.owner().ref("lombok.Setter"));
+                
+                if (includeHashcodeAndEquals) {
+                    clazz.annotate(clazz.owner().ref("lombok.EqualsAndHashCode"));
+                }
+                
+                if (includeToString) {
+                    clazz.annotate(clazz.owner().ref("lombok.ToString"));
+                }
+            }
+            
+            clazz.annotate(clazz.owner().ref("lombok.Builder"));
             clazz.annotate(clazz.owner().ref("lombok.NoArgsConstructor"));
             clazz.annotate(clazz.owner().ref("lombok.AllArgsConstructor"));
-            clazz.annotate(clazz.owner().ref("lombok.Builder"));
-            
-            if (includeHashcodeAndEquals) {
-                clazz.annotate(clazz.owner().ref("lombok.EqualsAndHashCode"));
-            }
-            
-            if (includeToString) {
-                clazz.annotate(clazz.owner().ref("lombok.ToString"));
-            }
             
         } catch (Exception e) {
             // Lombok annotations may fail if not on classpath - that's OK

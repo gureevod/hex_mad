@@ -287,6 +287,11 @@ public final class JsonToDtoGenerator {
             }
             
             @Override
+            public boolean isIncludeGeneratedAnnotation() {
+                return false; // Don't add @Generated annotation
+            }
+            
+            @Override
             public boolean isUseInnerClassBuilders() {
                 return false;
             }

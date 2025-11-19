@@ -1,0 +1,22 @@
+{
+  "user": {
+    "id": 123,
+    "name": "John Doe",
+    "contact": {
+      "email": "john.doe@example.com",
+      "phone": "123-456-7890"
+    },
+    "addresses": [
+      {
+        "type": "home",
+        "street": "123 Main St",
+        "city": "Anytown"
+      },
+      {
+        "type": "work",
+        "street": "456 Oak Ave",
+        "city": "Otherville"
+      }
+    ]
+  }
+}
