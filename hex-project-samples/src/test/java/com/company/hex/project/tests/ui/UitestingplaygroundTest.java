@@ -1,5 +1,6 @@
 package com.company.hex.project.tests.ui;
 
+import com.company.hex.project.annotations.UiTest;
 import com.company.hex.project.pages.SamplePage;
 import io.qameta.allure.Description;
 import io.qameta.allure.Severity;
@@ -8,6 +9,7 @@ import io.qameta.allure.Story;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+@UiTest
 public class UitestingplaygroundTest {
 
     @Test

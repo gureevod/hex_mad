@@ -17,6 +17,8 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import static com.codeborne.selenide.Selenide.$;
@@ -34,6 +36,7 @@ import static com.codeborne.selenide.Selenide.$$x;
 public class FieldInitializer {
     
     private static final Logger logger = LoggerFactory.getLogger(FieldInitializer.class);
+    private static final Map<Class<?>, List<Field>> FIELDS_CACHE = new ConcurrentHashMap<>();
     
     /**
      * Приватный конструктор для предотвращения создания экземпляров.
@@ -92,17 +95,17 @@ public class FieldInitializer {
      * @return список всех полей
      */
     private static List<Field> getAllFields(Class<?> clazz) {
-        List<Field> fields = new ArrayList<>();
-        
-        while (clazz != null && clazz != Object.class) {
-            Field[] declaredFields = clazz.getDeclaredFields();
-            for (Field field : declaredFields) {
-                fields.add(field);
+        return FIELDS_CACHE.computeIfAbsent(clazz, c -> {
+            List<Field> fields = new ArrayList<>();
+            Class<?> current = c;
+            while (current != null && current != Object.class) {
+                for (Field field : current.getDeclaredFields()) {
+                    fields.add(field);
+                }
+                current = current.getSuperclass();
             }
-            clazz = clazz.getSuperclass();
-        }
-        
-        return fields;
+            return fields;
+        });
     }
     
     /**
