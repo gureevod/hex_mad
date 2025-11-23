@@ -3,153 +3,181 @@ package com.company.hex.ui.elements;
 import com.codeborne.selenide.SelenideElement;
 import com.company.hex.ui.core.BaseElement;
 import io.qameta.allure.Step;
+import org.openqa.selenium.Keys;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.format.TextStyle;
-import java.util.Locale;
 
 import static com.codeborne.selenide.Condition.*;
-import static com.codeborne.selenide.Selenide.*;
+import static com.codeborne.selenide.Selenide.$x;
+import static com.codeborne.selenide.Selenide.actions;
 
 /**
- * Элемент выбора даты для Ant Design.
+ * Элемент выбора даты (DatePicker) для Ant Design.
+ * Реализован на основе логики работы с десятилетиями и индексами месяцев.
  */
 public class DatePicker extends BaseElement {
 
-    // Формат даты в атрибуте title ячейки AntD (обычно YYYY-MM-DD)
-    private static final DateTimeFormatter TITLE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    // Локатор выпадающего списка, который виден в данный момент
+    private static final String DROPDOWN_XPATH = "//div[contains(@class, 'ant-picker-dropdown') and not(contains(@class, 'hidden'))]";
+    
+    // Формат даты для ручного ввода (можно вынести в конфиг, если меняется)
+    private static final DateTimeFormatter INPUT_FORMAT = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
     public DatePicker(String name, SelenideElement element) {
         super(name, element);
     }
 
     /**
-     * Установить дату через UI (кликая по календарю).
+     * Выбирает дату через UI календаря.
+     * Логика: Открыть -> Выбрать год (через десятилетия) -> Выбрать месяц (по индексу) -> Выбрать день.
      *
-     * @param date желаемая дата
+     * @param date дата для выбора
      * @return this
      */
-    @Step("Установить дату '{date}' в '{this.name}'")
+    @Step("Выбрать дату '{date}' в календаре '{this.name}'")
     public DatePicker setDate(LocalDate date) {
-        logger.info("Установка даты '{}' в '{}' {}", date, name, getContext());
+        logger.info("Выбор даты {} в календаре {}", date, name);
 
-        // 1. Открываем календарь, если он не открыт
-        if (!isPanelVisible()) {
-            element.click();
-        }
+        openCalendar();
 
-        // 2. Находим активную (видимую) панель календаря
-        // В AntD панель находится в body, а не внутри элемента
-        SelenideElement panel = $$(".ant-picker-dropdown")
-                .findBy(visible)
-                .shouldBe(visible);
+        // 1. Установка года (специфичная логика AntD с выбором десятилетия)
+        selectYear(date.getYear());
 
-        // 3. Настраиваем Год и Месяц
-        adjustYearAndMonth(panel, date);
+        // 2. Установка месяца (по индексу 1-12)
+        selectMonth(date.getMonthValue());
 
-        // 4. Кликаем по дню
-        // Используем атрибут title="2025-10-26", это самый надежный способ в AntD
-        String dateTitle = date.format(TITLE_FORMAT);
+        // 3. Установка дня
+        selectDay(date.getDayOfMonth());
 
-        panel.$("td[title='" + dateTitle + "'] .ant-picker-cell-inner")
-                .scrollTo()
-                .click();
-
-        // 5. Ждем, пока панель закроется (значит выбор прошел успешно)
-        panel.should(disappear);
-
+        // Ждем закрытия дропдауна, чтобы убедиться, что дата выбрана
+        $x(DROPDOWN_XPATH).should(disappear);
+        
         return this;
     }
 
     /**
-     * Проверка, открыта ли панель календаря.
-     */
-    private boolean isPanelVisible() {
-        return $$(".ant-picker-dropdown").findBy(visible).isDisplayed();
-    }
-
-    /**
-     * Логика переключения года и месяца.
-     */
-    private void adjustYearAndMonth(SelenideElement panel, LocalDate targetDate) {
-        SelenideElement header = panel.$(".ant-picker-header");
-        SelenideElement yearBtn = header.$(".ant-picker-year-btn");
-        SelenideElement monthBtn = header.$(".ant-picker-month-btn");
-
-        // --- Настройка Года ---
-        int currentYear = Integer.parseInt(yearBtn.getText());
-        int targetYear = targetDate.getYear();
-
-        while (currentYear != targetYear) {
-            if (currentYear < targetYear) {
-                header.$(".ant-picker-header-super-next-btn").click();
-                currentYear++;
-            } else {
-                header.$(".ant-picker-header-super-prev-btn").click();
-                currentYear--;
-            }
-            // Небольшая защита от бесконечного цикла, если UI тормозит
-            yearBtn.shouldHave(text(String.valueOf(currentYear)));
-        }
-
-        // --- Настройка Месяца ---
-        // AntD пишет месяц как "Nov", "Jan" и т.д. (зависит от локали, здесь предполагаем English)
-        // Для надежности можно сравнивать через индексы или переключиться на вид выбора месяца,
-        // но простой перебор стрелками часто работает стабильнее.
-
-        String currentMonthStr = monthBtn.getText();
-        int currentMonth = parseMonth(currentMonthStr);
-        int targetMonth = targetDate.getMonthValue();
-
-        while (currentMonth != targetMonth) {
-            if (currentMonth < targetMonth) {
-                header.$(".ant-picker-header-next-btn").click();
-                currentMonth++;
-            } else {
-                header.$(".ant-picker-header-prev-btn").click();
-                currentMonth--;
-            }
-            // Ждем обновления текста месяца, чтобы не кликать слишком быстро
-            monthBtn.shouldNotHave(text(currentMonthStr));
-            currentMonthStr = monthBtn.getText();
-        }
-    }
-
-    /**
-     * Вспомогательный метод для парсинга месяца из текста (Дек -> 12).
-     */
-    private int parseMonth(String monthStr) {
-        // Пробуем распарсить короткое название (Jan, Feb...)
-        // Если у вас русская локаль, нужно поменять Locale.US на Locale.forLanguageTag("ru")
-        for (java.time.Month month : java.time.Month.values()) {
-            String shortName = month.getDisplayName(TextStyle.SHORT, new Locale("ru"));
-            if (monthStr.startsWith(shortName)) {
-                return month.getValue();
-            }
-        }
-        // Если не вышло, пробуем полное название или возвращаем ошибку
-        throw new IllegalStateException("Не удалось распознать месяц: " + monthStr);
-    }
-
-    /**
-     * Быстрый ввод даты через input (если поле не read-only).
+     * Вводит дату вручную через поле ввода (быстрый способ).
+     * Использует Ctrl+A -> Backspace для очистки.
+     *
+     * @param date дата для ввода
+     * @return this
      */
     @Step("Ввести дату '{date}' вручную в '{this.name}'")
-    public DatePicker typeDate(LocalDate date, String pattern) {
-        String dateStr = date.format(DateTimeFormatter.ofPattern(pattern));
-        logger.info("Ввод даты '{}' в '{}'", dateStr, name);
+    public DatePicker typeDate(LocalDate date) {
+        String dateString = date.format(INPUT_FORMAT);
+        logger.info("Ручной ввод даты {} в поле {}", dateString, name);
 
-        // В AntD input часто лежит внутри span, ищем тег input
-        SelenideElement input = element.getTagName().equals("input") ? element : element.$("input");
-
+        // Находим input внутри компонента (обычно он вложен)
+        SelenideElement input = element.$("input");
+        
         input.click();
-        // Используем Keys.chord(Keys.CONTROL, "a") + Keys.BACK_SPACE если clear() не работает
-        input.sendKeys(org.openqa.selenium.Keys.chord(org.openqa.selenium.Keys.CONTROL, "a"));
-        input.sendKeys(org.openqa.selenium.Keys.BACK_SPACE);
-        input.sendKeys(dateStr);
+        actions().keyDown(Keys.CONTROL).sendKeys("a").keyUp(Keys.CONTROL).sendKeys(Keys.BACK_SPACE).perform();
+        input.sendKeys(dateString);
         input.pressEnter();
 
         return this;
+    }
+
+    /**
+     * Очищает значение в календаре, нажимая на иконку крестика (clear icon).
+     * Иконка появляется только при наведении курсора.
+     *
+     * @return this
+     */
+    @Step("Очистить календарь '{this.name}'")
+    public DatePicker clear() {
+        logger.info("Очистка календаря {}", name);
+        
+        // Наводим курсор, чтобы появилась иконка очистки
+        element.hover();
+        
+        SelenideElement clearBtn = element.$(".ant-picker-clear");
+        if (clearBtn.exists() && clearBtn.isDisplayed()) {
+            clearBtn.click();
+        } else {
+            logger.debug("Иконка очистки не найдена или календарь уже пуст");
+        }
+        
+        return this;
+    }
+
+    /**
+     * Проверяет, что указанная дата недоступна для выбора (disabled).
+     *
+     * @param date дата для проверки
+     * @return true, если дата заблокирована
+     */
+    @Step("Проверить, что дата '{date}' недоступна в '{this.name}'")
+    public boolean isDateDisabled(LocalDate date) {
+        openCalendar();
+        
+        // Необходимо переключиться на нужный месяц/год, чтобы увидеть ячейку
+        // Упрощенно: предполагаем, что мы уже близко, или используем логику setDate без клика по дню
+        // Для полной надежности здесь нужно дублировать навигацию selectYear -> selectMonth
+        selectYear(date.getYear());
+        selectMonth(date.getMonthValue());
+
+        String dayText = String.valueOf(date.getDayOfMonth());
+        SelenideElement dayCell = $x(String.format("%s//td[contains(@class, 'ant-picker-cell') and .//text()='%s']", 
+                DROPDOWN_XPATH, dayText));
+
+        boolean isDisabled = dayCell.getAttribute("class").contains("disabled");
+        
+        // Закрываем календарь кликом вовне или Escape (опционально)
+        element.pressEscape();
+        
+        return isDisabled;
+    }
+
+    private void openCalendar() {
+        // Если дропдаун уже виден, не кликаем
+        if (!$x(DROPDOWN_XPATH).isDisplayed()) {
+            element.click();
+            $x(DROPDOWN_XPATH).shouldBe(visible);
+        }
+    }
+
+    private void selectYear(int year) {
+        // Кнопка переключения года (в шапке)
+        SelenideElement yearBtn = $x(DROPDOWN_XPATH + "//*[@class='ant-picker-year-btn']");
+        
+        // Логика из CalendarHelper: кликаем дважды, чтобы выйти в выбор десятилетия
+        yearBtn.click();
+        yearBtn.click();
+
+        // Вычисляем диапазон десятилетия (например, для 2025 это "2020-2029")
+        String decadeRange = resolveYearGroup(year);
+        
+        // Выбираем диапазон
+        String rangeXpath = String.format("%s//*[@class='ant-picker-cell-inner' and text()='%s']", DROPDOWN_XPATH, decadeRange);
+        $x(rangeXpath).click();
+
+        // Выбираем конкретный год
+        String yearXpath = String.format("%s//*[@class='ant-picker-cell-inner' and text()='%d']", DROPDOWN_XPATH, year);
+        $x(yearXpath).click();
+    }
+
+    private void selectMonth(int monthIndex) {
+        // Выбор месяца по индексу (1-12).
+        // XPath ищет n-й элемент среди видимых ячеек месяца.
+        String monthXpath = String.format("(%s//*[contains(@class, 'ant-picker-cell-in-view')])[%d]", DROPDOWN_XPATH, monthIndex);
+        $x(monthXpath).click();
+    }
+
+    private void selectDay(int day) {
+        // Выбор дня по тексту внутри видимых ячеек (in-view исключает дни соседних месяцев)
+        String dayXpath = String.format("%s//td[contains(@class, 'ant-picker-cell-in-view')]//*[text()='%d']", DROPDOWN_XPATH, day);
+        $x(dayXpath).click();
+    }
+
+    /**
+     * Вычисляет диапазон десятилетия для года.
+     * Пример: 2025 -> "2020-2029"
+     */
+    private String resolveYearGroup(int year) {
+        int startYear = (year / 10) * 10;
+        int endYear = startYear + 9;
+        return startYear + "-" + endYear;
     }
 }
