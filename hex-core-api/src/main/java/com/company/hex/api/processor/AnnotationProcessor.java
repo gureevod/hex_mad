@@ -1,6 +1,9 @@
 package com.company.hex.api.processor;
 
 import com.company.hex.api.annotations.config.ApiService;
+import com.company.hex.api.annotations.config.Headers;
+import com.company.hex.api.annotations.config.Retry;
+import com.company.hex.api.annotations.config.ExpectedStatus;
 import com.company.hex.api.annotations.http.DELETE;
 import com.company.hex.api.annotations.http.GET;
 import com.company.hex.api.annotations.http.PATCH;
@@ -11,6 +14,7 @@ import com.company.hex.api.annotations.param.FormParam;
 import com.company.hex.api.annotations.param.Header;
 import com.company.hex.api.annotations.param.Path;
 import com.company.hex.api.annotations.param.Query;
+import com.company.hex.api.config.PropertyResolver;
 import com.company.hex.api.model.RequestDefinition;
 import com.company.hex.core.logging.HexLoggerFactory;
 import org.slf4j.Logger;
@@ -18,6 +22,11 @@ import org.slf4j.Logger;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Processes method annotations to extract HTTP request metadata.
@@ -30,6 +39,54 @@ public class AnnotationProcessor {
     
     private static final Logger logger = HexLoggerFactory.getApiLogger(AnnotationProcessor.class);
     
+    // Кэш для метаданных методов (потокобезопасный)
+    private final ConcurrentHashMap<Method, MethodMetadata> metadataCache = new ConcurrentHashMap<>();
+    
+    /**
+     * Внутренний класс для хранения кэшированных метаданных методов.
+     * Содержит все статические данные, извлеченные из аннотаций.
+     */
+    private static class MethodMetadata {
+        final String httpMethod;
+        final String path;
+        final List<ParameterMetadata> parameters;
+        final boolean hasRetry;
+        final Retry retryConfig;
+        final int[] expectedStatuses;
+        final Map<String, String> staticHeaders;
+        
+        MethodMetadata(String httpMethod, String path, List<ParameterMetadata> parameters,
+                      boolean hasRetry, Retry retryConfig, int[] expectedStatuses,
+                      Map<String, String> staticHeaders) {
+            this.httpMethod = httpMethod;
+            this.path = path;
+            this.parameters = parameters;
+            this.hasRetry = hasRetry;
+            this.retryConfig = retryConfig;
+            this.expectedStatuses = expectedStatuses;
+            this.staticHeaders = staticHeaders;
+        }
+    }
+    
+    /**
+     * Метаданные для параметра метода.
+     */
+    private static class ParameterMetadata {
+        final int index;
+        final ParameterType type;
+        final String name;
+        
+        enum ParameterType {
+            PATH, QUERY, HEADER, FORM_PARAM, BODY
+        }
+        
+        ParameterMetadata(int index, ParameterType type, String name) {
+            this.index = index;
+            this.type = type;
+            this.name = name;
+        }
+    }
+    
     /**
      * Process a method and its arguments to create a RequestDefinition.
      * 
@@ -39,26 +96,157 @@ public class AnnotationProcessor {
      * @return a RequestDefinition containing all request metadata
      */
     public RequestDefinition process(Method method, Object[] args, Class<?> serviceClass) {
-        logger.debug("Processing method: {}.{}", serviceClass.getSimpleName(), method.getName());
+        logger.debug("Обработка метода: {}.{}", serviceClass.getSimpleName(), method.getName());
         
+        // Получаем или парсим метаданные метода (с кэшированием)
+        MethodMetadata metadata = metadataCache.computeIfAbsent(method, this::parseMethodMetadata);
+        
+        // Строим RequestDefinition используя кэшированные метаданные и runtime аргументы
+        RequestDefinition definition = buildRequestDefinition(metadata, method, args, serviceClass);
+        
+        logger.debug("Создан RequestDefinition: {}", definition);
+        return definition;
+    }
+    
+    /**
+     * Парсит метаданные метода из аннотаций (вызывается один раз, результат кэшируется).
+     *
+     * @param method метод для парсинга
+     * @return кэшированные метаданные
+     */
+    private MethodMetadata parseMethodMetadata(Method method) {
+        logger.debug("Парсинг метаданных метода: {}", method.getName());
+        
+        // Извлекаем HTTP метод и путь
+        String httpMethod = null;
+        String path = null;
+        
+        if (method.isAnnotationPresent(GET.class)) {
+            GET get = method.getAnnotation(GET.class);
+            httpMethod = "GET";
+            path = get.value();
+        } else if (method.isAnnotationPresent(POST.class)) {
+            POST post = method.getAnnotation(POST.class);
+            httpMethod = "POST";
+            path = post.value();
+        } else if (method.isAnnotationPresent(PUT.class)) {
+            PUT put = method.getAnnotation(PUT.class);
+            httpMethod = "PUT";
+            path = put.value();
+        } else if (method.isAnnotationPresent(DELETE.class)) {
+            DELETE delete = method.getAnnotation(DELETE.class);
+            httpMethod = "DELETE";
+            path = delete.value();
+        } else if (method.isAnnotationPresent(PATCH.class)) {
+            PATCH patch = method.getAnnotation(PATCH.class);
+            httpMethod = "PATCH";
+            path = patch.value();
+        }
+        
+        // Извлекаем информацию о параметрах
+        List<ParameterMetadata> parameterMetadata = new ArrayList<>();
+        Parameter[] parameters = method.getParameters();
+        
+        for (int i = 0; i < parameters.length; i++) {
+            Parameter parameter = parameters[i];
+            
+            if (parameter.isAnnotationPresent(Path.class)) {
+                Path pathAnnotation = parameter.getAnnotation(Path.class);
+                parameterMetadata.add(new ParameterMetadata(i, ParameterMetadata.ParameterType.PATH, pathAnnotation.value()));
+            } else if (parameter.isAnnotationPresent(Query.class)) {
+                Query queryAnnotation = parameter.getAnnotation(Query.class);
+                parameterMetadata.add(new ParameterMetadata(i, ParameterMetadata.ParameterType.QUERY, queryAnnotation.value()));
+            } else if (parameter.isAnnotationPresent(Header.class)) {
+                Header headerAnnotation = parameter.getAnnotation(Header.class);
+                parameterMetadata.add(new ParameterMetadata(i, ParameterMetadata.ParameterType.HEADER, headerAnnotation.value()));
+            } else if (parameter.isAnnotationPresent(FormParam.class)) {
+                FormParam formParamAnnotation = parameter.getAnnotation(FormParam.class);
+                parameterMetadata.add(new ParameterMetadata(i, ParameterMetadata.ParameterType.FORM_PARAM, formParamAnnotation.value()));
+            } else if (parameter.isAnnotationPresent(Body.class)) {
+                parameterMetadata.add(new ParameterMetadata(i, ParameterMetadata.ParameterType.BODY, null));
+            }
+        }
+        
+        // Извлекаем конфигурацию повторных попыток
+        boolean hasRetry = method.isAnnotationPresent(Retry.class);
+        Retry retryConfig = hasRetry ? method.getAnnotation(Retry.class) : null;
+        
+        // Извлекаем ожидаемые статусы
+        int[] expectedStatuses = new int[0];
+        if (method.isAnnotationPresent(ExpectedStatus.class)) {
+            ExpectedStatus expectedStatus = method.getAnnotation(ExpectedStatus.class);
+            expectedStatuses = expectedStatus.value();
+        }
+        
+        // Извлекаем статические заголовки из @Headers аннотации
+        Map<String, String> staticHeaders = processHeadersAnnotation(method);
+        
+        logger.debug("Метаданные метода {} кэшированы: HTTP={}, Path={}, Parameters={}, StaticHeaders={}",
+                    method.getName(), httpMethod, path, parameterMetadata.size(), staticHeaders.size());
+        
+        return new MethodMetadata(httpMethod, path, parameterMetadata, hasRetry, retryConfig, expectedStatuses, staticHeaders);
+    }
+    
+    /**
+     * Строит RequestDefinition используя кэшированные метаданные и runtime аргументы.
+     *
+     * @param metadata кэшированные метаданные метода
+     * @param method метод интерфейса
+     * @param args аргументы вызова метода
+     * @param serviceClass класс сервисного интерфейса
+     * @return RequestDefinition для выполнения
+     */
+    private RequestDefinition buildRequestDefinition(MethodMetadata metadata, Method method,
+                                                     Object[] args, Class<?> serviceClass) {
         RequestDefinition.Builder builder = RequestDefinition.builder();
         
-        // Store the method reference for annotation access
+        // Сохраняем ссылку на метод
         builder.method(method);
         
-        // Extract service-level configuration
+        // Устанавливаем HTTP метод и путь из кэша
+        builder.httpMethod(metadata.httpMethod);
+        builder.path(metadata.path);
+        
+        // Обрабатываем аннотацию на уровне сервиса
         processServiceAnnotation(serviceClass, builder);
         
-        // Extract HTTP method and path
-        processHttpMethodAnnotation(method, builder);
+        // Добавляем статические заголовки из метаданных
+        for (Map.Entry<String, String> header : metadata.staticHeaders.entrySet()) {
+            builder.addHeader(header.getKey(), header.getValue());
+            logger.debug("Статический header: {} = {}", header.getKey(), header.getValue());
+        }
         
-        // Extract parameter annotations
-        processParameters(method, args, builder);
+        // Обрабатываем параметры используя кэшированные метаданные
+        if (args != null && args.length > 0) {
+            for (ParameterMetadata paramMetadata : metadata.parameters) {
+                Object arg = args[paramMetadata.index];
+                
+                switch (paramMetadata.type) {
+                    case PATH:
+                        builder.addPathParam(paramMetadata.name, arg);
+                        logger.debug("Path параметр: {} = {}", paramMetadata.name, arg);
+                        break;
+                    case QUERY:
+                        builder.addQueryParam(paramMetadata.name, arg);
+                        logger.debug("Query параметр: {} = {}", paramMetadata.name, arg);
+                        break;
+                    case HEADER:
+                        builder.addHeader(paramMetadata.name, arg);
+                        logger.debug("Header: {} = {}", paramMetadata.name, arg);
+                        break;
+                    case FORM_PARAM:
+                        builder.addFormParam(paramMetadata.name, arg);
+                        logger.debug("Form параметр: {} = {}", paramMetadata.name, arg);
+                        break;
+                    case BODY:
+                        builder.body(arg);
+                        logger.debug("Request body установлен: {}", arg != null ? arg.getClass().getSimpleName() : "null");
+                        break;
+                }
+            }
+        }
         
-        RequestDefinition definition = builder.build();
-        logger.debug("Created RequestDefinition: {}", definition);
-        
-        return definition;
+        return builder.build();
     }
     
     /**
@@ -69,10 +257,10 @@ public class AnnotationProcessor {
         if (apiService != null) {
             String baseUrl = apiService.baseUrl();
             if (!baseUrl.isEmpty()) {
-                // Resolve property placeholders if needed
-                baseUrl = resolvePropertyPlaceholder(baseUrl);
+                // Разрешаем плейсхолдеры свойств
+                baseUrl = PropertyResolver.resolve(baseUrl);
                 builder.baseUrl(baseUrl);
-                logger.debug("Set base URL from @ApiService: {}", baseUrl);
+                logger.debug("Установлен base URL из @ApiService: {}", baseUrl);
             }
             
             String basePath = apiService.basePath();
@@ -84,90 +272,40 @@ public class AnnotationProcessor {
     }
     
     /**
-     * Process HTTP method annotations (@GET, @POST, @PUT, @DELETE, @PATCH).
+     * Обрабатывает аннотацию @Headers и извлекает статические заголовки.
+     *
+     * @param method метод для обработки
+     * @return Map заголовков (название -> значение)
      */
-    private void processHttpMethodAnnotation(Method method, RequestDefinition.Builder builder) {
-        if (method.isAnnotationPresent(GET.class)) {
-            GET get = method.getAnnotation(GET.class);
-            builder.httpMethod("GET");
-            builder.path(get.value());
-            logger.debug("HTTP Method: GET, Path: {}", get.value());
-        } else if (method.isAnnotationPresent(POST.class)) {
-            POST post = method.getAnnotation(POST.class);
-            builder.httpMethod("POST");
-            builder.path(post.value());
-            logger.debug("HTTP Method: POST, Path: {}", post.value());
-        } else if (method.isAnnotationPresent(PUT.class)) {
-            PUT put = method.getAnnotation(PUT.class);
-            builder.httpMethod("PUT");
-            builder.path(put.value());
-            logger.debug("HTTP Method: PUT, Path: {}", put.value());
-        } else if (method.isAnnotationPresent(DELETE.class)) {
-            DELETE delete = method.getAnnotation(DELETE.class);
-            builder.httpMethod("DELETE");
-            builder.path(delete.value());
-            logger.debug("HTTP Method: DELETE, Path: {}", delete.value());
-        } else if (method.isAnnotationPresent(PATCH.class)) {
-            PATCH patch = method.getAnnotation(PATCH.class);
-            builder.httpMethod("PATCH");
-            builder.path(patch.value());
-            logger.debug("HTTP Method: PATCH, Path: {}", patch.value());
-        } else {
-            throw new IllegalStateException("Method " + method.getName() + " must have an HTTP method annotation (@GET, @POST, @PUT, @DELETE, @PATCH)");
-        }
-    }
-    
-    /**
-     * Process parameter annotations (@Path, @Query, @Header, @FormParam, @Body).
-     */
-    private void processParameters(Method method, Object[] args, RequestDefinition.Builder builder) {
-        Parameter[] parameters = method.getParameters();
+    private Map<String, String> processHeadersAnnotation(Method method) {
+        Map<String, String> headers = new HashMap<>();
         
-        if (args == null || args.length == 0) {
-            return;
+        if (!method.isAnnotationPresent(Headers.class)) {
+            return headers;
         }
         
-        for (int i = 0; i < parameters.length; i++) {
-            Parameter parameter = parameters[i];
-            Object arg = args[i];
+        Headers headersAnnotation = method.getAnnotation(Headers.class);
+        String[] headerStrings = headersAnnotation.value();
+        
+        for (String headerString : headerStrings) {
+            // Парсим формат "Header-Name: Header-Value"
+            int colonIndex = headerString.indexOf(':');
+            if (colonIndex == -1) {
+                logger.warn("Неверный формат заголовка '{}' в методе {}. Ожидается 'Header-Name: Header-Value'",
+                           headerString, method.getName());
+                continue;
+            }
             
-            if (parameter.isAnnotationPresent(Path.class)) {
-                Path path = parameter.getAnnotation(Path.class);
-                builder.addPathParam(path.value(), arg);
-                logger.debug("Path param: {} = {}", path.value(), arg);
-            } else if (parameter.isAnnotationPresent(Query.class)) {
-                Query query = parameter.getAnnotation(Query.class);
-                builder.addQueryParam(query.value(), arg);
-                logger.debug("Query param: {} = {}", query.value(), arg);
-            } else if (parameter.isAnnotationPresent(Header.class)) {
-                Header header = parameter.getAnnotation(Header.class);
-                builder.addHeader(header.value(), arg);
-                logger.debug("Header: {} = {}", header.value(), arg);
-            } else if (parameter.isAnnotationPresent(FormParam.class)) {
-                FormParam formParam = parameter.getAnnotation(FormParam.class);
-                builder.addFormParam(formParam.value(), arg);
-                logger.debug("Form param: {} = {}", formParam.value(), arg);
-            } else if (parameter.isAnnotationPresent(Body.class)) {
-                builder.body(arg);
-                logger.debug("Request body set: {}", arg != null ? arg.getClass().getSimpleName() : "null");
-            }
+            String headerName = headerString.substring(0, colonIndex).trim();
+            String headerValue = headerString.substring(colonIndex + 1).trim();
+            
+            // Разрешаем плейсхолдеры в значении заголовка
+            headerValue = PropertyResolver.resolve(headerValue);
+            
+            headers.put(headerName, headerValue);
+            logger.debug("Извлечен статический заголовок из @Headers: {} = {}", headerName, headerValue);
         }
-    }
-    
-    /**
-     * Resolve property placeholders like ${property.name}.
-     * For MVP, this is a simple implementation. Can be enhanced later.
-     */
-    private String resolvePropertyPlaceholder(String value) {
-        if (value.startsWith("${") && value.endsWith("}")) {
-            String propertyName = value.substring(2, value.length() - 1);
-            String resolved = System.getProperty(propertyName);
-            if (resolved != null) {
-                logger.debug("Resolved property {} to {}", propertyName, resolved);
-                return resolved;
-            }
-            logger.warn("Property {} not found, using original value", propertyName);
-        }
-        return value;
+        
+        return headers;
     }
 }

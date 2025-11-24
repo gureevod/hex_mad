@@ -1,5 +1,6 @@
 package com.company.hex.api.converter;
 
+import com.company.hex.api.exception.ApiConversionException;
 import com.company.hex.core.logging.HexLoggerFactory;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -47,6 +48,7 @@ public class JacksonResponseConverter implements ResponseConverter {
         }
         
         String responseBody = response.getBody().asString();
+        int statusCode = response.getStatusCode();
         logger.debug("Response body: {}", responseBody);
         
         try {
@@ -56,7 +58,7 @@ public class JacksonResponseConverter implements ResponseConverter {
                 JavaType javaType = objectMapper.getTypeFactory()
                     .constructType(parameterizedType);
                 T result = objectMapper.readValue(responseBody, javaType);
-                logger.debug("Successfully converted response to parameterized type: {}", returnType);
+                logger.debug("Успешно сконвертирован ответ в параметризованный тип: {}", returnType);
                 return result;
             }
             
@@ -64,15 +66,21 @@ public class JacksonResponseConverter implements ResponseConverter {
             if (returnType instanceof Class) {
                 Class<T> clazz = (Class<T>) returnType;
                 T result = objectMapper.readValue(responseBody, clazz);
-                logger.debug("Successfully converted response to class: {}", clazz.getSimpleName());
+                logger.debug("Успешно сконвертирован ответ в класс: {}", clazz.getSimpleName());
                 return result;
             }
             
-            throw new IllegalArgumentException("Unsupported return type: " + returnType);
+            String errorMsg = "Неподдерживаемый тип возврата: " + returnType;
+            logger.error(errorMsg);
+            throw new ApiConversionException(errorMsg, returnType, responseBody, statusCode);
             
+        } catch (ApiConversionException e) {
+            // Пробрасываем наше исключение дальше
+            throw e;
         } catch (Exception e) {
-            logger.error("Failed to convert response to type {}: {}", returnType, e.getMessage(), e);
-            throw new RuntimeException("Failed to convert response to " + returnType, e);
+            String errorMsg = "Не удалось десериализовать ответ";
+            logger.error("Ошибка конвертации ответа в тип {}: {}", returnType, e.getMessage(), e);
+            throw new ApiConversionException(errorMsg, e, returnType, responseBody, statusCode);
         }
     }
 }

@@ -11,6 +11,7 @@ import com.company.hex.api.interceptor.RetryInterceptor;
 import com.company.hex.api.interceptor.StatusValidationInterceptor;
 import com.company.hex.api.processor.AnnotationProcessor;
 import com.company.hex.api.proxy.ProxyHandler;
+import com.company.hex.api.validation.InterfaceValidator;
 import com.company.hex.core.config.HexConfigException;
 import com.company.hex.core.config.HexConfigFactory;
 import org.slf4j.Logger;
@@ -39,6 +40,15 @@ public final class ApiServiceFactory {
     }
     
     /**
+     * Создает новый builder для настройки API сервиса.
+     *
+     * @return новый экземпляр ApiServiceFactoryBuilder
+     */
+    public static ApiServiceFactoryBuilder builder() {
+        return new ApiServiceFactoryBuilder();
+    }
+    
+    /**
      * Create a declarative API service from an annotated interface.
      * This is the primary method for creating type-safe, annotation-driven API clients.
      *
@@ -55,7 +65,10 @@ public final class ApiServiceFactory {
             throw new HexConfigException("Service class must be an interface: " + serviceInterface.getName());
         }
         
-        logger.info("Creating declarative API service: {}", serviceInterface.getSimpleName());
+        // Валидируем интерфейс перед созданием прокси
+        InterfaceValidator.validate(serviceInterface);
+        
+        logger.info("Создание декларативного API сервиса: {}", serviceInterface.getSimpleName());
         
         // Create default components
         AnnotationProcessor annotationProcessor = new AnnotationProcessor();
@@ -87,7 +100,7 @@ public final class ApiServiceFactory {
             handler
         );
         
-        logger.info("Successfully created declarative API service: {}", serviceInterface.getSimpleName());
+        logger.info("Успешно создан декларативный API сервис: {}", serviceInterface.getSimpleName());
         return proxy;
     }
     
@@ -112,7 +125,10 @@ public final class ApiServiceFactory {
             throw new HexConfigException("API configuration cannot be null");
         }
         
-        logger.info("Creating declarative API service with custom config: {}", serviceInterface.getSimpleName());
+        // Валидируем интерфейс перед созданием прокси
+        InterfaceValidator.validate(serviceInterface);
+        
+        logger.info("Создание декларативного API сервиса с пользовательской конфигурацией: {}", serviceInterface.getSimpleName());
         
         // Create components with custom config
         AnnotationProcessor annotationProcessor = new AnnotationProcessor();
@@ -144,7 +160,7 @@ public final class ApiServiceFactory {
             handler
         );
         
-        logger.info("Successfully created declarative API service with custom config: {}", serviceInterface.getSimpleName());
+        logger.info("Успешно создан декларативный API сервис с пользовательской конфигурацией: {}", serviceInterface.getSimpleName());
         return proxy;
     }
 
