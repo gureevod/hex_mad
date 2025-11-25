@@ -10,6 +10,7 @@ import com.company.hex.ui.core.BaseComponent;
 import com.company.hex.ui.core.BaseElement;
 import com.company.hex.ui.core.ElementSettings;
 import com.company.hex.ui.core.UiContext;
+import com.company.hex.ui.exception.ElementConfigurationException;
 import com.company.hex.core.config.HexConfigFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -131,18 +132,20 @@ public class FieldInitializer {
         
         // Валидация
         if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException(
-                    String.format("Поле '%s' в классе '%s' имеет пустое имя в аннотации @Element",
-                            field.getName(), target.getClass().getName()));
+            throw new ElementConfigurationException(
+                    field.getName(),
+                    target.getClass().getName(),
+                    "Поле имеет пустое имя в аннотации @Element. Укажите параметр 'name' в аннотации.");
         }
         
         String xpath = annotation.xpath();
         String css = annotation.css();
         
         if ((xpath == null || xpath.trim().isEmpty()) && (css == null || css.trim().isEmpty())) {
-            throw new IllegalArgumentException(
-                    String.format("Поле '%s' в классе '%s' должно иметь xpath или css локатор",
-                            field.getName(), target.getClass().getName()));
+            throw new ElementConfigurationException(
+                    field.getName(),
+                    target.getClass().getName(),
+                    "Поле должно иметь xpath или css локатор. Укажите один из параметров в аннотации @Element.");
         }
         
         // Определяем тип локатора и сам локатор
@@ -153,9 +156,11 @@ public class FieldInitializer {
         Class<? extends BaseElement> elementType = (Class<? extends BaseElement>) field.getType();
         
         if (!BaseElement.class.isAssignableFrom(elementType)) {
-            throw new IllegalArgumentException(
-                    String.format("Поле '%s' в классе '%s' должно быть типа BaseElement или его наследника",
-                            field.getName(), target.getClass().getName()));
+            throw new ElementConfigurationException(
+                    field.getName(),
+                    target.getClass().getName(),
+                    String.format("Поле должно быть типа BaseElement или его наследника, но имеет тип %s",
+                            elementType.getName()));
         }
         
         // Создаем элемент напрямую (Selenide уже обеспечивает lazy resolution)
@@ -208,18 +213,20 @@ public class FieldInitializer {
         
         // Валидация
         if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException(
-                    String.format("Поле '%s' в классе '%s' имеет пустое имя в аннотации @Elements",
-                            field.getName(), target.getClass().getName()));
+            throw new ElementConfigurationException(
+                    field.getName(),
+                    target.getClass().getName(),
+                    "Поле имеет пустое имя в аннотации @Elements. Укажите параметр 'name' в аннотации.");
         }
         
         String xpath = annotation.xpath();
         String css = annotation.css();
         
         if ((xpath == null || xpath.trim().isEmpty()) && (css == null || css.trim().isEmpty())) {
-            throw new IllegalArgumentException(
-                    String.format("Поле '%s' в классе '%s' должно иметь xpath или css локатор",
-                            field.getName(), target.getClass().getName()));
+            throw new ElementConfigurationException(
+                    field.getName(),
+                    target.getClass().getName(),
+                    "Поле должно иметь xpath или css локатор. Укажите один из параметров в аннотации @Elements.");
         }
         
         // Определяем тип локатора и сам локатор
@@ -235,14 +242,17 @@ public class FieldInitializer {
         // Создаем resolver для коллекции
         Supplier<ElementsCollection> resolver = createCollectionResolver(locator, isXpath, componentRoot);
         
-        // Создаем ElementList
-        ElementList<?> elementList = new ElementList<>(name, resolver, elementType, context);
+        // Сохраняем шаблон локатора для возможности параметризации через resolve()
+        String locatorTemplate = locator;
+        
+        // Создаем ElementList с поддержкой параметризации
+        ElementList<?> elementList = new ElementList<>(name, resolver, elementType, context, locatorTemplate, isXpath);
         
         // Устанавливаем в поле
         setField(field, target, elementList);
         
-        logger.trace("Поле '{}' инициализировано как ElementList<{}> с именем '{}'",
-                field.getName(), elementType.getSimpleName(), name);
+        logger.trace("Поле '{}' инициализировано как ElementList<{}> с именем '{}' и шаблоном локатора '{}'",
+                field.getName(), elementType.getSimpleName(), name, locatorTemplate);
     }
     
     /**
@@ -300,23 +310,27 @@ public class FieldInitializer {
         
         // Валидация
         if (componentName == null || componentName.trim().isEmpty()) {
-            throw new IllegalArgumentException(
-                    String.format("Поле '%s' в классе '%s' имеет пустое имя в аннотации @Component",
-                            field.getName(), target.getClass().getName()));
+            throw new ElementConfigurationException(
+                    field.getName(),
+                    target.getClass().getName(),
+                    "Поле имеет пустое имя в аннотации @Component. Укажите параметр 'name' в аннотации.");
         }
         
         if (componentRoot == null || componentRoot.trim().isEmpty()) {
-            throw new IllegalArgumentException(
-                    String.format("Поле '%s' в классе '%s' должно иметь root локатор в аннотации @Component",
-                            field.getName(), target.getClass().getName()));
+            throw new ElementConfigurationException(
+                    field.getName(),
+                    target.getClass().getName(),
+                    "Поле должно иметь root локатор в аннотации @Component. Укажите параметр 'root' в аннотации.");
         }
         
         // Проверяем что поле имеет тип BaseComponent
         Class<?> componentType = field.getType();
         if (!BaseComponent.class.isAssignableFrom(componentType)) {
-            throw new IllegalArgumentException(
-                    String.format("Поле '%s' в классе '%s' должно быть типа BaseComponent или его наследника",
-                            field.getName(), target.getClass().getName()));
+            throw new ElementConfigurationException(
+                    field.getName(),
+                    target.getClass().getName(),
+                    String.format("Поле должно быть типа BaseComponent или его наследника, но имеет тип %s",
+                            componentType.getName()));
         }
         
         try {
@@ -333,11 +347,12 @@ public class FieldInitializer {
                     componentName, componentType.getSimpleName(), field.getName());
             
         } catch (Exception e) {
-            String errorMessage = String.format(
-                    "Ошибка при создании компонента '%s' типа %s: %s",
-                    componentName, componentType.getName(), e.getMessage());
-            logger.error(errorMessage, e);
-            throw new RuntimeException(errorMessage, e);
+            throw new ElementConfigurationException(
+                    field.getName(),
+                    target.getClass().getName(),
+                    String.format("Не удалось создать экземпляр компонента '%s' типа %s: %s",
+                            componentName, componentType.getName(), e.getMessage()),
+                    e);
         }
     }
     

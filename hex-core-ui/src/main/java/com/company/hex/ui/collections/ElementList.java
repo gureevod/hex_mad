@@ -47,15 +47,34 @@ public class ElementList<T extends BaseElement> implements Iterable<T> {
     private final Class<T> type;
     private final UiContext context;
     
+    // Для параметризованных локаторов
+    private final String locatorTemplate;
+    private final boolean isXpath;
+    
     /**
      * Создать ElementList с указанными параметрами.
-     * 
+     *
      * @param name имя коллекции для логирования и Allure
      * @param resolver поставщик ElementsCollection для ленивой резолвации
      * @param type класс элементов в коллекции
      * @param context контекст UI (страница + компонент)
      */
     public ElementList(String name, Supplier<ElementsCollection> resolver, Class<T> type, UiContext context) {
+        this(name, resolver, type, context, null, false);
+    }
+    
+    /**
+     * Создать ElementList с поддержкой параметризованных локаторов.
+     *
+     * @param name имя коллекции для логирования и Allure
+     * @param resolver поставщик ElementsCollection для ленивой резолвации
+     * @param type класс элементов в коллекции
+     * @param context контекст UI (страница + компонент)
+     * @param locatorTemplate шаблон локатора с плейсхолдерами (может быть null)
+     * @param isXpath true если локатор является XPath
+     */
+    public ElementList(String name, Supplier<ElementsCollection> resolver, Class<T> type,
+                      UiContext context, String locatorTemplate, boolean isXpath) {
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Имя коллекции не может быть null или пустым");
         }
@@ -73,6 +92,8 @@ public class ElementList<T extends BaseElement> implements Iterable<T> {
         this.resolver = resolver;
         this.type = type;
         this.context = context;
+        this.locatorTemplate = locatorTemplate;
+        this.isXpath = isXpath;
         this.logger = HexLoggerFactory.getUiLogger(ElementList.class);
     }
     
@@ -506,13 +527,86 @@ public class ElementList<T extends BaseElement> implements Iterable<T> {
     /**
      * Создать новую коллекцию с подставленными параметрами в локатор.
      * Используется для динамических локаторов с плейсхолдерами.
-     * 
+     * Параметры передаются парами: "имя", "значение", "имя", "значение", ...
+     *
+     * <p>Пример:</p>
+     * <pre>
+     * {@code
+     * @Elements(name = "User Rows", xpath = "//tr[@data-status='{status}'][@data-role='{role}']")
+     * ElementList<TextElement> userRows;
+     *
+     * // Использование
+     * userRows.resolve("status", "active", "role", "admin").shouldHaveSize(5);
+     * }
+     * </pre>
+     *
      * @param nameValuePairs пары имя-значение для подстановки
      * @return новая коллекция с подставленными параметрами
+     * @throws UnsupportedOperationException если коллекция не имеет шаблона локатора
+     * @throws IllegalArgumentException если количество параметров нечетное
      */
-    public ElementList<T> resolve(Object... nameValuePairs) {
-        // TODO: Реализация будет добавлена при интеграции с Builder API
-        throw new UnsupportedOperationException("Метод resolve() будет реализован в Builder API");
+    public ElementList<T> resolve(String... nameValuePairs) {
+        if (locatorTemplate == null) {
+            throw new UnsupportedOperationException(
+                String.format("Метод resolve() доступен только для коллекций с параметризованным локатором. " +
+                    "Коллекция '%s' не имеет шаблона локатора.", name));
+        }
+        
+        // Преобразуем varargs в Map
+        if (nameValuePairs.length % 2 != 0) {
+            throw new IllegalArgumentException(
+                "Параметры должны быть парами: имя1, значение1, имя2, значение2, ...");
+        }
+        
+        Map<String, String> params = new java.util.HashMap<>();
+        for (int i = 0; i < nameValuePairs.length; i += 2) {
+            params.put(nameValuePairs[i], nameValuePairs[i + 1]);
+        }
+        
+        return resolve(params);
+    }
+    
+    /**
+     * Создать новую коллекцию с подставленными параметрами из Map.
+     *
+     * <p>Пример:</p>
+     * <pre>
+     * {@code
+     * Map<String, String> filters = Map.of(
+     *     "status", "active",
+     *     "department", "IT"
+     * );
+     * userRows.resolve(filters).shouldNotBeEmpty();
+     * }
+     * </pre>
+     *
+     * @param params map параметров для подстановки
+     * @return новая коллекция с подставленными параметрами
+     * @throws UnsupportedOperationException если коллекция не имеет шаблона локатора
+     */
+    public ElementList<T> resolve(Map<String, String> params) {
+        if (locatorTemplate == null) {
+            throw new UnsupportedOperationException(
+                String.format("Метод resolve() доступен только для коллекций с параметризованным локатором. " +
+                    "Коллекция '%s' не имеет шаблона локатора.", name));
+        }
+        
+        // Используем LocatorResolver для подстановки параметров
+        String resolvedLocator = com.company.hex.ui.locator.LocatorResolver.resolve(locatorTemplate, params);
+        
+        logger.debug("Resolved локатор для '{}': '{}' -> '{}'", name, locatorTemplate, resolvedLocator);
+        
+        // Создаем новый resolver с подставленным локатором
+        Supplier<ElementsCollection> newResolver = () -> {
+            if (isXpath) {
+                return com.codeborne.selenide.Selenide.$$x(resolvedLocator);
+            } else {
+                return com.codeborne.selenide.Selenide.$$(resolvedLocator);
+            }
+        };
+        
+        // Создаем новую коллекцию с разрешенным локатором
+        return new ElementList<>(name, newResolver, type, context, resolvedLocator, isXpath);
     }
     
     // ==================== Iterable ====================
