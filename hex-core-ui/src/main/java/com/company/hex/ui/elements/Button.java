@@ -47,9 +47,11 @@ public class Button extends BaseElement {
     @Override
     @Step("Клик по кнопке '{this.name}'")
     public Button click() {
-        logger.info("Клик по кнопке '{}' {}", name, getContext());
-        element.click();
-        logger.debug("Кнопка '{}' успешно нажата", name);
+        executeWithInterceptors("click", new Object[]{}, () -> {
+            logger.info("Клик по кнопке '{}' {}", name, getContext());
+            element.click();
+            logger.debug("Кнопка '{}' успешно нажата", name);
+        });
         return this;
     }
     
@@ -62,9 +64,11 @@ public class Button extends BaseElement {
     @Override
     @Step("Двойной клик по кнопке '{this.name}'")
     public Button doubleClick() {
-        logger.info("Двойной клик по кнопке '{}' {}", name, getContext());
-        element.doubleClick();
-        logger.debug("Двойной клик по кнопке '{}' выполнен", name);
+        executeWithInterceptors("doubleClick", new Object[]{}, () -> {
+            logger.info("Двойной клик по кнопке '{}' {}", name, getContext());
+            element.doubleClick();
+            logger.debug("Двойной клик по кнопке '{}' выполнен", name);
+        });
         return this;
     }
     
@@ -77,9 +81,11 @@ public class Button extends BaseElement {
     @Override
     @Step("Навести курсор на кнопку '{this.name}'")
     public Button hover() {
-        logger.info("Наведение курсора на кнопку '{}' {}", name, getContext());
-        element.hover();
-        logger.debug("Курсор наведен на кнопку '{}'", name);
+        executeWithInterceptors("hover", new Object[]{}, () -> {
+            logger.info("Наведение курсора на кнопку '{}' {}", name, getContext());
+            element.hover();
+            logger.debug("Курсор наведен на кнопку '{}'", name);
+        });
         return this;
     }
     
@@ -91,9 +97,11 @@ public class Button extends BaseElement {
      */
     @Step("Клик по кнопке '{this.name}' через JavaScript")
     public Button clickViaJs() {
-        logger.info("Клик через JavaScript по кнопке '{}' {}", name, getContext());
-        element.click(com.codeborne.selenide.ClickOptions.usingJavaScript());
-        logger.debug("Клик через JavaScript по кнопке '{}' выполнен", name);
+        executeWithInterceptors("clickViaJs", new Object[]{}, () -> {
+            logger.info("Клик через JavaScript по кнопке '{}' {}", name, getContext());
+            element.click(com.codeborne.selenide.ClickOptions.usingJavaScript());
+            logger.debug("Клик через JavaScript по кнопке '{}' выполнен", name);
+        });
         return this;
     }
     
@@ -106,9 +114,11 @@ public class Button extends BaseElement {
      */
     @Step("Клик по кнопке '{this.name}' со смещением ({offsetX}, {offsetY})")
     public Button clickWithOffset(int offsetX, int offsetY) {
-        logger.info("Клик со смещением ({}, {}) по кнопке '{}' {}", offsetX, offsetY, name, getContext());
-        element.click(com.codeborne.selenide.ClickOptions.usingDefaultMethod().offset(offsetX, offsetY));
-        logger.debug("Клик со смещением по кнопке '{}' выполнен", name);
+        executeWithInterceptors("clickWithOffset", new Object[]{offsetX, offsetY}, () -> {
+            logger.info("Клик со смещением ({}, {}) по кнопке '{}' {}", offsetX, offsetY, name, getContext());
+            element.click(com.codeborne.selenide.ClickOptions.usingDefaultMethod().offset(offsetX, offsetY));
+            logger.debug("Клик со смещением по кнопке '{}' выполнен", name);
+        });
         return this;
     }
     

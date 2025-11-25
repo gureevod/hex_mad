@@ -48,10 +48,12 @@ public class Input extends BaseElement {
      */
     @Step("Заполнить '{this.name}' значением '{text}'")
     public Input fill(String text) {
-        logger.info("Заполнение '{}' значением '{}' {}", name, text, getContext());
-        element.clear();
-        element.setValue(text);
-        logger.debug("Поле '{}' успешно заполнено", name);
+        executeWithInterceptors("fill", new Object[]{text}, () -> {
+            logger.info("Заполнение '{}' значением '{}' {}", name, text, getContext());
+            element.clear();
+            element.setValue(text);
+            logger.debug("Поле '{}' успешно заполнено", name);
+        });
         return this;
     }
     
@@ -62,9 +64,11 @@ public class Input extends BaseElement {
      */
     @Step("Очистить '{this.name}'")
     public Input clear() {
-        logger.info("Очистка '{}' {}", name, getContext());
-        element.clear();
-        logger.debug("Поле '{}' успешно очищено", name);
+        executeWithInterceptors("clear", new Object[]{}, () -> {
+            logger.info("Очистка '{}' {}", name, getContext());
+            element.clear();
+            logger.debug("Поле '{}' успешно очищено", name);
+        });
         return this;
     }
     
@@ -76,9 +80,11 @@ public class Input extends BaseElement {
      */
     @Step("Добавить '{text}' к '{this.name}'")
     public Input append(String text) {
-        logger.info("Добавление '{}' к '{}' {}", text, name, getContext());
-        element.append(text);
-        logger.debug("Текст успешно добавлен к '{}'", name);
+        executeWithInterceptors("append", new Object[]{text}, () -> {
+            logger.info("Добавление '{}' к '{}' {}", text, name, getContext());
+            element.append(text);
+            logger.debug("Текст успешно добавлен к '{}'", name);
+        });
         return this;
     }
     
@@ -104,9 +110,11 @@ public class Input extends BaseElement {
      */
     @Step("Ввести посимвольно '{text}' в '{this.name}'")
     public Input type(String text) {
-        logger.info("Посимвольный ввод '{}' в '{}' {}", text, name, getContext());
-        element.sendKeys(text);
-        logger.debug("Текст успешно введен в '{}'", name);
+        executeWithInterceptors("type", new Object[]{text}, () -> {
+            logger.info("Посимвольный ввод '{}' в '{}' {}", text, name, getContext());
+            element.sendKeys(text);
+            logger.debug("Текст успешно введен в '{}'", name);
+        });
         return this;
     }
     
@@ -117,8 +125,10 @@ public class Input extends BaseElement {
      */
     @Step("Нажать Enter в '{this.name}'")
     public Input pressEnter() {
-        logger.info("Нажатие Enter в '{}' {}", name, getContext());
-        element.pressEnter();
+        executeWithInterceptors("pressEnter", new Object[]{}, () -> {
+            logger.info("Нажатие Enter в '{}' {}", name, getContext());
+            element.pressEnter();
+        });
         return this;
     }
     
@@ -129,8 +139,10 @@ public class Input extends BaseElement {
      */
     @Step("Нажать Tab в '{this.name}'")
     public Input pressTab() {
-        logger.info("Нажатие Tab в '{}' {}", name, getContext());
-        element.pressTab();
+        executeWithInterceptors("pressTab", new Object[]{}, () -> {
+            logger.info("Нажатие Tab в '{}' {}", name, getContext());
+            element.pressTab();
+        });
         return this;
     }
     
@@ -141,8 +153,10 @@ public class Input extends BaseElement {
      */
     @Step("Нажать Escape в '{this.name}'")
     public Input pressEscape() {
-        logger.info("Нажатие Escape в '{}' {}", name, getContext());
-        element.pressEscape();
+        executeWithInterceptors("pressEscape", new Object[]{}, () -> {
+            logger.info("Нажатие Escape в '{}' {}", name, getContext());
+            element.pressEscape();
+        });
         return this;
     }
     

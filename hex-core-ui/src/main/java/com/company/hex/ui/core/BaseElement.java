@@ -3,9 +3,14 @@ package com.company.hex.ui.core;
 import com.codeborne.selenide.SelenideElement;
 import com.codeborne.selenide.WebElementCondition;
 import com.company.hex.core.logging.HexLoggerFactory;
+import com.company.hex.ui.interceptor.ElementInterceptor;
+import com.company.hex.ui.interceptor.ElementInterceptorRegistry;
 import io.qameta.allure.Step;
 import org.openqa.selenium.WebElement;
 import org.slf4j.Logger;
+
+import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Базовый абстрактный класс для всех UI элементов в Hex Framework.
@@ -177,14 +182,96 @@ public abstract class BaseElement {
     }
     
     /**
+     * Выполнить действие с вызовом interceptors.
+     * Используется для оборачивания любых действий с элементами.
+     *
+     * @param <R> тип результата действия
+     * @param actionName имя действия для логирования и interceptors
+     * @param args аргументы действия
+     * @param action действие для выполнения
+     * @return результат действия
+     */
+    protected <R> R executeWithInterceptors(String actionName, Object[] args, Supplier<R> action) {
+        // Проверяем, есть ли зарегистрированные interceptors
+        if (!ElementInterceptorRegistry.hasInterceptors()) {
+            // Если нет interceptors, просто выполняем действие
+            return action.get();
+        }
+        
+        List<ElementInterceptor> interceptors = ElementInterceptorRegistry.getAll();
+        
+        // Вызов beforeAction у всех interceptors
+        for (ElementInterceptor interceptor : interceptors) {
+            try {
+                interceptor.beforeAction(this, actionName, args);
+            } catch (Exception e) {
+                logger.warn("Interceptor beforeAction ошибка для '{}': {}",
+                    interceptor.getClass().getSimpleName(), e.getMessage());
+            }
+        }
+        
+        R result = null;
+        Exception error = null;
+        
+        // Выполнение действия
+        try {
+            result = action.get();
+        } catch (Exception e) {
+            error = e;
+        }
+        
+        // Вызов afterAction или onError у всех interceptors
+        for (ElementInterceptor interceptor : interceptors) {
+            try {
+                if (error == null) {
+                    interceptor.afterAction(this, actionName, result);
+                } else {
+                    interceptor.onError(this, actionName, error);
+                }
+            } catch (Exception e) {
+                logger.warn("Interceptor {} ошибка для '{}': {}",
+                    error == null ? "afterAction" : "onError",
+                    interceptor.getClass().getSimpleName(),
+                    e.getMessage());
+            }
+        }
+        
+        // Если произошла ошибка, пробрасываем её дальше
+        if (error != null) {
+            if (error instanceof RuntimeException) {
+                throw (RuntimeException) error;
+            }
+            throw new RuntimeException(error);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Упрощенная версия executeWithInterceptors для void методов.
+     *
+     * @param actionName имя действия
+     * @param args аргументы действия
+     * @param action действие для выполнения
+     */
+    protected void executeWithInterceptors(String actionName, Object[] args, Runnable action) {
+        executeWithInterceptors(actionName, args, () -> {
+            action.run();
+            return null;
+        });
+    }
+    
+    /**
      * Кликнуть по элементу.
-     * 
+     *
      * @return this для fluent API
      */
     @Step("Клик по '{this.name}'")
     public BaseElement click() {
-        logger.info("Клик по '{}' {}", name, getContext());
-        element.click();
+        executeWithInterceptors("click", new Object[]{}, () -> {
+            logger.info("Клик по '{}' {}", name, getContext());
+            element.click();
+        });
         return this;
     }
     
@@ -195,8 +282,10 @@ public abstract class BaseElement {
      */
     @Step("Двойной клик по '{this.name}'")
     public BaseElement doubleClick() {
-        logger.info("Двойной клик по '{}' {}", name, getContext());
-        element.doubleClick();
+        executeWithInterceptors("doubleClick", new Object[]{}, () -> {
+            logger.info("Двойной клик по '{}' {}", name, getContext());
+            element.doubleClick();
+        });
         return this;
     }
     
@@ -207,8 +296,10 @@ public abstract class BaseElement {
      */
     @Step("Навести курсор на '{this.name}'")
     public BaseElement hover() {
-        logger.info("Наведение курсора на '{}' {}", name, getContext());
-        element.hover();
+        executeWithInterceptors("hover", new Object[]{}, () -> {
+            logger.info("Наведение курсора на '{}' {}", name, getContext());
+            element.hover();
+        });
         return this;
     }
     
@@ -247,8 +338,10 @@ public abstract class BaseElement {
      */
     @Step("'{this.name}' должен быть {condition}")
     public BaseElement shouldBe(WebElementCondition condition) {
-        logger.info("Проверка '{}' должен быть {} {}", name, condition, getContext());
-        element.shouldBe(condition, getTimeout());
+        executeWithInterceptors("shouldBe", new Object[]{condition}, () -> {
+            logger.info("Проверка '{}' должен быть {} {}", name, condition, getContext());
+            element.shouldBe(condition, getTimeout());
+        });
         return this;
     }
     
@@ -273,8 +366,10 @@ public abstract class BaseElement {
      */
     @Step("'{this.name}' должен иметь {condition}")
     public BaseElement shouldHave(WebElementCondition condition) {
-        logger.info("Проверка '{}' должен иметь {} {}", name, condition, getContext());
-        element.shouldHave(condition, getTimeout());
+        executeWithInterceptors("shouldHave", new Object[]{condition}, () -> {
+            logger.info("Проверка '{}' должен иметь {} {}", name, condition, getContext());
+            element.shouldHave(condition, getTimeout());
+        });
         return this;
     }
     
@@ -299,8 +394,10 @@ public abstract class BaseElement {
      */
     @Step("'{this.name}' НЕ должен быть {condition}")
     public BaseElement shouldNotBe(WebElementCondition condition) {
-        logger.info("Проверка '{}' НЕ должен быть {} {}", name, condition, getContext());
-        element.shouldNotBe(condition, getTimeout());
+        executeWithInterceptors("shouldNotBe", new Object[]{condition}, () -> {
+            logger.info("Проверка '{}' НЕ должен быть {} {}", name, condition, getContext());
+            element.shouldNotBe(condition, getTimeout());
+        });
         return this;
     }
     
@@ -312,8 +409,10 @@ public abstract class BaseElement {
      */
     @Step("'{this.name}' НЕ должен иметь {condition}")
     public BaseElement shouldNotHave(WebElementCondition condition) {
-        logger.info("Проверка '{}' НЕ должен иметь {} {}", name, condition, getContext());
-        element.shouldNotHave(condition, getTimeout());
+        executeWithInterceptors("shouldNotHave", new Object[]{condition}, () -> {
+            logger.info("Проверка '{}' НЕ должен иметь {} {}", name, condition, getContext());
+            element.shouldNotHave(condition, getTimeout());
+        });
         return this;
     }
     
