@@ -1,14 +1,16 @@
 package com.company.hex.ui.factory;
 
 import com.codeborne.selenide.ElementsCollection;
-import com.codeborne.selenide.SelenideElement;
 import com.company.hex.ui.annotations.Component;
 import com.company.hex.ui.annotations.Element;
 import com.company.hex.ui.annotations.Elements;
 import com.company.hex.ui.collections.ElementList;
+import com.company.hex.ui.config.UiConfig;
 import com.company.hex.ui.core.BaseComponent;
 import com.company.hex.ui.core.BaseElement;
+import com.company.hex.ui.core.ElementSettings;
 import com.company.hex.ui.core.UiContext;
+import com.company.hex.core.config.HexConfigFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,7 +23,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
-import static com.codeborne.selenide.Selenide.$;
 import static com.codeborne.selenide.Selenide.$$;
 import static com.codeborne.selenide.Selenide.$$x;
 
@@ -166,6 +167,17 @@ public class FieldInitializer {
                 componentRoot,
                 pageName,
                 componentName);
+        
+        // Устанавливаем настройки из аннотации
+        try {
+            UiConfig config = HexConfigFactory.getConfig(UiConfig.class);
+            ElementSettings settings = ElementSettings.fromAnnotation(annotation, config);
+            element.setSettings(settings);
+            logger.trace("Настройки элемента '{}' установлены: timeout={}s, polling={}ms",
+                name, settings.getTimeout().getSeconds(), settings.getPollingInterval().toMillis());
+        } catch (Exception e) {
+            logger.warn("Не удалось установить настройки для элемента '{}': {}", name, e.getMessage());
+        }
         
         // Устанавливаем элемент в поле
         setField(field, target, element);
@@ -352,27 +364,17 @@ public class FieldInitializer {
             String componentName) {
         
         try {
-            // Строим полный локатор
-            String fullLocator = buildFullLocator(locator, isXpath, componentRoot);
+            // Используем ElementCreator для создания элемента
+            ElementCreator.CreateElementRequest<T> request =
+                ElementCreator.CreateElementRequest.<T>builder(elementType)
+                    .withName(name)
+                    .withLocator(locator)
+                    .withXpath(isXpath)
+                    .withComponentRoot(componentRoot)
+                    .withContext(new UiContext(pageName, componentName))
+                    .build();
             
-            // Находим SelenideElement (lazy по умолчанию в Selenide)
-            SelenideElement selenideElement;
-            if (isXpath) {
-                selenideElement = $(org.openqa.selenium.By.xpath(fullLocator));
-            } else {
-                selenideElement = $(org.openqa.selenium.By.cssSelector(fullLocator));
-            }
-            
-            // Создаем элемент через фабрику
-            T element = ElementFactory.create(elementType, name, selenideElement);
-            
-            // Устанавливаем контекст
-            if (pageName != null) {
-                element.setPageName(pageName);
-            }
-            if (componentName != null) {
-                element.setComponentName(componentName);
-            }
+            T element = ElementCreator.create(request);
             
             logger.debug("Элемент '{}' типа {} успешно создан", name, elementType.getSimpleName());
             return element;
@@ -383,38 +385,6 @@ public class FieldInitializer {
                     name, elementType.getSimpleName(), locator);
             logger.error(errorMessage, e);
             throw new RuntimeException(errorMessage, e);
-        }
-    }
-    
-    /**
-     * Построить полный локатор с учетом componentRoot.
-     *
-     * @param locator базовый локатор
-     * @param isXpath true если xpath
-     * @param componentRoot корневой локатор компонента
-     * @return полный локатор
-     */
-    private static String buildFullLocator(String locator, boolean isXpath, String componentRoot) {
-        if (componentRoot == null || componentRoot.trim().isEmpty()) {
-            return locator;
-        }
-        
-        // Если элемент внутри компонента, комбинируем локаторы
-        if (isXpath) {
-            // Для xpath: componentRoot + относительный локатор
-            if (locator.startsWith(".//")) {
-                // Относительный локатор - добавляем к root
-                return componentRoot + "/" + locator.substring(3);
-            } else if (locator.startsWith("//")) {
-                // Абсолютный локатор - используем как есть
-                return locator;
-            } else {
-                // Локатор без префикса - делаем относительным
-                return componentRoot + "//" + locator;
-            }
-        } else {
-            // Для CSS: используем вложенность через пробел
-            return componentRoot + " " + locator;
         }
     }
     

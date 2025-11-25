@@ -29,6 +29,9 @@ public abstract class BaseElement {
     protected String pageName;
     protected String componentName;
     
+    // Настройки элемента (timeout, polling interval)
+    protected ElementSettings settings;
+    
     /**
      * Конструктор базового элемента.
      * 
@@ -86,11 +89,29 @@ public abstract class BaseElement {
     
     /**
      * Установить имя компонента для контекстного логирования.
-     * 
+     *
      * @param componentName имя компонента
      */
     public void setComponentName(String componentName) {
         this.componentName = componentName;
+    }
+    
+    /**
+     * Установить настройки элемента.
+     *
+     * @param settings настройки элемента
+     */
+    public void setSettings(ElementSettings settings) {
+        this.settings = settings;
+    }
+    
+    /**
+     * Получить настройки элемента.
+     *
+     * @return настройки или null если не установлены
+     */
+    public ElementSettings getSettings() {
+        return settings;
     }
     
     /**
@@ -113,11 +134,46 @@ public abstract class BaseElement {
     
     /**
      * Получить полный контекст для логирования.
-     * 
+     *
      * @return строка с контекстом
      */
     protected String getContext() {
         return String.format("в странице '%s' компоненте '%s'", getPageName(), getComponentName());
+    }
+    
+    /**
+     * Получить timeout для ожидания.
+     *
+     * @return timeout из настроек или Duration.ofSeconds(10) по умолчанию
+     */
+    protected java.time.Duration getTimeout() {
+        return settings != null ? settings.getTimeout() : java.time.Duration.ofSeconds(10);
+    }
+    
+    /**
+     * Получить polling interval для ожидания.
+     *
+     * @return polling interval из настроек или Duration.ofMillis(200) по умолчанию
+     */
+    protected java.time.Duration getPollingInterval() {
+        return settings != null ? settings.getPollingInterval() : java.time.Duration.ofMillis(200);
+    }
+    
+    /**
+     * Временно изменить timeout для цепочки вызовов.
+     * Создает новые настройки с измененным timeout.
+     *
+     * @param timeout новый timeout
+     * @return this для fluent API
+     */
+    @SuppressWarnings("unchecked")
+    public <T extends BaseElement> T withTimeout(java.time.Duration timeout) {
+        if (this.settings != null) {
+            this.settings = this.settings.withTimeout(timeout);
+        } else {
+            this.settings = new ElementSettings(timeout, java.time.Duration.ofMillis(200));
+        }
+        return (T) this;
     }
     
     /**
@@ -185,14 +241,14 @@ public abstract class BaseElement {
     
     /**
      * Проверить, что элемент соответствует условию.
-     * 
+     *
      * @param condition условие для проверки
      * @return this для fluent API
      */
     @Step("'{this.name}' должен быть {condition}")
     public BaseElement shouldBe(WebElementCondition condition) {
         logger.info("Проверка '{}' должен быть {} {}", name, condition, getContext());
-        element.shouldBe(condition);
+        element.shouldBe(condition, getTimeout());
         return this;
     }
     
@@ -211,14 +267,14 @@ public abstract class BaseElement {
     
     /**
      * Проверить, что элемент имеет условие.
-     * 
+     *
      * @param condition условие для проверки
      * @return this для fluent API
      */
     @Step("'{this.name}' должен иметь {condition}")
     public BaseElement shouldHave(WebElementCondition condition) {
         logger.info("Проверка '{}' должен иметь {} {}", name, condition, getContext());
-        element.shouldHave(condition);
+        element.shouldHave(condition, getTimeout());
         return this;
     }
     
@@ -237,27 +293,27 @@ public abstract class BaseElement {
     
     /**
      * Проверить, что элемент НЕ соответствует условию.
-     * 
+     *
      * @param condition условие для проверки
      * @return this для fluent API
      */
     @Step("'{this.name}' НЕ должен быть {condition}")
     public BaseElement shouldNotBe(WebElementCondition condition) {
         logger.info("Проверка '{}' НЕ должен быть {} {}", name, condition, getContext());
-        element.shouldNotBe(condition);
+        element.shouldNotBe(condition, getTimeout());
         return this;
     }
     
     /**
      * Проверить, что элемент НЕ имеет условие.
-     * 
+     *
      * @param condition условие для проверки
      * @return this для fluent API
      */
     @Step("'{this.name}' НЕ должен иметь {condition}")
     public BaseElement shouldNotHave(WebElementCondition condition) {
         logger.info("Проверка '{}' НЕ должен иметь {} {}", name, condition, getContext());
-        element.shouldNotHave(condition);
+        element.shouldNotHave(condition, getTimeout());
         return this;
     }
     

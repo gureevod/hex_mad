@@ -1,16 +1,12 @@
 package com.company.hex.ui.builder;
 
-import com.codeborne.selenide.SelenideElement;
 import com.company.hex.ui.core.BaseElement;
-import com.company.hex.ui.factory.ElementFactory;
+import com.company.hex.ui.factory.ElementCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.Map;
-
-import static com.codeborne.selenide.Selenide.$;
 
 /**
  * Базовый builder для создания UI элементов с fluent API.
@@ -127,23 +123,30 @@ public abstract class ElementBuilder<T extends BaseElement, B extends ElementBui
     
     /**
      * Построить элемент.
-     * 
+     *
      * @return созданный элемент
      */
     public T build() {
         validateBeforeBuild();
         
         String locator = getLocator();
-        SelenideElement selenideElement = createSelenideElement(locator);
         
-        Class<? extends BaseElement> elementClass = customImplementation != null 
-            ? customImplementation 
+        Class<? extends BaseElement> elementClass = customImplementation != null
+            ? customImplementation
             : getDefaultElementClass();
         
-        @SuppressWarnings("unchecked")
-        T element = (T) ElementFactory.create(elementClass, name, selenideElement);
+        // Используем ElementCreator для создания элемента
+        ElementCreator.CreateElementRequest<?> request =
+            ElementCreator.CreateElementRequest.builder(elementClass)
+                .withName(name)
+                .withLocator(locator)
+                .withXpath(true)  // Builder использует XPath по умолчанию
+                .build();
         
-        logger.debug("Создан элемент '{}' типа {} с локатором: {}", 
+        @SuppressWarnings("unchecked")
+        T element = (T) ElementCreator.create(request);
+        
+        logger.debug("Создан элемент '{}' типа {} с локатором: {}",
             name, elementClass.getSimpleName(), locator);
         
         return element;
@@ -151,7 +154,7 @@ public abstract class ElementBuilder<T extends BaseElement, B extends ElementBui
     
     /**
      * Построить элемент с подстановкой параметров.
-     * 
+     *
      * @param params параметры для подстановки (пары ключ-значение)
      * @return элемент с разрешенным локатором
      */
@@ -167,16 +170,22 @@ public abstract class ElementBuilder<T extends BaseElement, B extends ElementBui
             locator = locatorBuilder.resolve(params);
         }
         
-        SelenideElement selenideElement = createSelenideElement(locator);
-        
-        Class<? extends BaseElement> elementClass = customImplementation != null 
-            ? customImplementation 
+        Class<? extends BaseElement> elementClass = customImplementation != null
+            ? customImplementation
             : getDefaultElementClass();
         
-        @SuppressWarnings("unchecked")
-        T element = (T) ElementFactory.create(elementClass, name, selenideElement);
+        // Используем ElementCreator для создания элемента
+        ElementCreator.CreateElementRequest<?> request =
+            ElementCreator.CreateElementRequest.builder(elementClass)
+                .withName(name)
+                .withLocator(locator)
+                .withXpath(true)
+                .build();
         
-        logger.debug("Создан параметризованный элемент '{}' типа {} с локатором: {}", 
+        @SuppressWarnings("unchecked")
+        T element = (T) ElementCreator.create(request);
+        
+        logger.debug("Создан параметризованный элемент '{}' типа {} с локатором: {}",
             name, elementClass.getSimpleName(), locator);
         
         return element;
@@ -184,7 +193,7 @@ public abstract class ElementBuilder<T extends BaseElement, B extends ElementBui
     
     /**
      * Построить элемент с подстановкой параметров из Map.
-     * 
+     *
      * @param params map параметров
      * @return элемент с разрешенным локатором
      */
@@ -199,14 +208,20 @@ public abstract class ElementBuilder<T extends BaseElement, B extends ElementBui
             locator = locatorBuilder.resolve(params);
         }
         
-        SelenideElement selenideElement = createSelenideElement(locator);
-        
-        Class<? extends BaseElement> elementClass = customImplementation != null 
-            ? customImplementation 
+        Class<? extends BaseElement> elementClass = customImplementation != null
+            ? customImplementation
             : getDefaultElementClass();
         
+        // Используем ElementCreator для создания элемента
+        ElementCreator.CreateElementRequest<?> request =
+            ElementCreator.CreateElementRequest.builder(elementClass)
+                .withName(name)
+                .withLocator(locator)
+                .withXpath(true)
+                .build();
+        
         @SuppressWarnings("unchecked")
-        T element = (T) ElementFactory.create(elementClass, name, selenideElement);
+        T element = (T) ElementCreator.create(request);
         
         return element;
     }
@@ -236,26 +251,11 @@ public abstract class ElementBuilder<T extends BaseElement, B extends ElementBui
     
     /**
      * Получить финальный локатор.
-     * 
+     *
      * @return локатор
      */
     protected String getLocator() {
         return simpleLocator != null ? simpleLocator : locatorBuilder.build();
-    }
-    
-    /**
-     * Создать SelenideElement с учетом настроек.
-     * 
-     * @param locator XPath локатор
-     * @return SelenideElement
-     */
-    protected SelenideElement createSelenideElement(String locator) {
-        SelenideElement element = $(locator);
-        
-        // Применяем timeout если установлен
-        // TODO: Реализовать применение timeout и pollingInterval когда Selenide API позволит
-        
-        return element;
     }
     
     /**

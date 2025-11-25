@@ -68,12 +68,21 @@ public interface UiConfig extends BaseConfig {
 
     /**
      * Получить таймаут для UI элементов в секундах.
-     * 
+     *
      * @return таймаут в секундах
      */
     @Key("hex.ui.timeout")
     @DefaultValue("10")
     int uiTimeout();
+
+    /**
+     * Получить интервал polling для ожидания элементов в миллисекундах.
+     *
+     * @return интервал polling в миллисекундах
+     */
+    @Key("hex.ui.polling.interval")
+    @DefaultValue("200")
+    long pollingInterval();
 
     /**
      * Получить таймаут для загрузки страницы в секундах.
