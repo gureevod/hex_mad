@@ -1,129 +1,156 @@
 package com.company.hex.project.components;
 
+import com.codeborne.selenide.ElementsCollection;
 import com.codeborne.selenide.SelenideElement;
+import com.company.hex.ui.annotations.Element;
 import com.company.hex.ui.core.BaseComponent;
 import com.company.hex.ui.elements.Button;
-import com.company.hex.ui.elements.TextElement;
-import com.company.hex.ui.annotations.Element;
+import com.company.hex.ui.elements.Input;
 import io.qameta.allure.Step;
+import org.openqa.selenium.By;
 
 import java.time.Duration;
-import java.util.List;
 
-import static com.codeborne.selenide.CollectionCondition.size;
-import static com.codeborne.selenide.CollectionCondition.textsInAnyOrder;
+import static com.codeborne.selenide.CollectionCondition.sizeGreaterThan;
 import static com.codeborne.selenide.Condition.*;
-import static com.codeborne.selenide.Selenide.$$x;
+import static com.codeborne.selenide.Selenide.*;
 
 /**
- * Компонент для работы с Ant Design Select.
- * Обрабатывает сложность с выпадающим списком, который рендерится вне DOM-дерева компонента.
+ * Компонент для работы с модальным окном поиска (Ant Design Drawer).
+ * Включает в себя кнопку открытия (три точки) и логику работы внутри модалки.
  */
 public class ModalWindow extends BaseComponent {
 
-    // Локатор кнопки открытия списка (находится ВНУТРИ root компонента)
-    @Element(name = "Select Trigger", xpath = ".//div[contains(@class, 'ant-select-selector')]")
-    private Button trigger;
+    // --- Локаторы внутри компонента (Trigger) ---
 
-    // Локатор текущего выбранного значения (ВНУТРИ root)
-    @Element(name = "Current Value", xpath = ".//span[contains(@class, 'ant-select-selection-item')]")
-    private TextElement currentValue;
+    @Element(name = "Кнопка открытия модалки (...)", xpath = ".//button//span[contains(@class, 'anticon-ellipsis')]")
+    private Button triggerButton;
 
-    // Локатор кнопки очистки (крестик), если есть
-    @Element(name = "Clear Icon", xpath = ".//span[contains(@class, 'ant-select-clear')]")
-    private Button clearIcon;
+    // --- Глобальные локаторы (Modal Content) ---
+    // Модалка рендерится в корень body, поэтому ищем глобально, а не от this.element
 
-    // Глобальный локатор для выпадающего слоя (находится в body, ВНЕ root)
-    // Ant Design добавляет класс 'ant-select-dropdown' и убирает 'hidden' при открытии
-    private static final String DROPDOWN_LAYER_XPATH =
-            "//div[contains(@class, 'ant-select-dropdown') and not(contains(@class, 'hidden'))]";
+    // Сложный XPath из легаси кода для надежности
+    private static final String INPUT_XPATH = "(//*[@class[contains(.,'ant-drawer-open')]]//*[@class[contains(.,'ant-drawer-content')]]//*[contains(@data-test-id, '_modal_searchInput')])|(//*[@data-test-id = 'ModalFind_search_input'])|(//*[@class = 'ant-drawer-content']// input[contains(@data-test-id, 'searchInput')])";
 
-    private static final String OPTIONS_XPATH =
-            ".//div[contains(@class, 'ant-select-item-option')]";
+    // Обертки над глобальными элементами.
+    // Мы создаем их "на лету" или через new, так как они вне контекста BaseComponent
+    private final Input searchInput = new Input("Поле поиска в модалке", $x(INPUT_XPATH));
+    private final Button searchButton = new Button("Кнопка 'Поиск'", $x("//button[text()='Поиск. Модальное окно']")); // Текст из легаси
+    private final Button applyButton = new Button("Кнопка 'Применить'", $x("//button[span[text()='Применить']]"));
+    private final Button closeButton = new Button("Кнопка закрытия (X)", $x("//button[@aria-label='Close' and contains(@class, 'ant-drawer-close')]"));
 
     /**
-     * Получить текущее выбранное значение.
+     * Открывает модальное окно.
+     * Содержит логику повторной попытки (Retry), если анимация не отработала.
      */
-    @Step("Получить текущее значение из '{this.componentName}'")
-    public String getValue() {
-        return currentValue.getText();
-    }
+    @Step("Открыть модальное окно '{this.componentName}'")
+    public ModalWindow open() {
+        // Ждем исчезновения оверлеев (если были)
+        $(".ant-spin-nested-loading").shouldNotBe(visible);
 
-    /**
-     * Выбрать значение из списка.
-     *
-     * @param value текст опции, которую нужно выбрать
-     */
-    @Step("Выбрать значение '{value}' в '{this.componentName}'")
-    public ModalWindow select(String value) {
-        // 1. Если значение уже выбрано - ничего не делаем (оптимизация)
-        if (currentValue.exists() && value.equals(currentValue.getText())) {
-            logger.info("Значение '{}' уже выбрано в '{}'", value, getComponentName());
-            return this;
+        triggerButton.shouldBe(visible, enabled).click();
+
+        try {
+            // Ждем появления инпута. Если не появился за 2 секунды - кидаем исключение, которое ловим ниже
+            searchInput.getElement().shouldBe(clickable, Duration.ofSeconds(2));
+        } catch (AssertionError e) {
+            logger.warn("Модальное окно не открылось с первого раза. Пробуем кликнуть еще раз.");
+            triggerButton.click();
+            searchInput.getElement().shouldBe(clickable, Duration.ofSeconds(5));
         }
-
-        // 2. Открываем список
-        openDropdown();
-
-        // 3. Ищем опцию в глобальном слое и кликаем
-        // Используем $$x, так как ищем от корня страницы, а не от this.element
-        SelenideElement option = $$x(DROPDOWN_LAYER_XPATH + OPTIONS_XPATH)
-                .findBy(text(value));
-
-        logger.info("Клик по опции '{}'", value);
-        option.shouldBe(visible).click();
-
-        // 4. Ждем, пока список закроется (опционально, для стабильности)
-        $$x(DROPDOWN_LAYER_XPATH).shouldHave(size(0), Duration.ofMillis(500));
 
         return this;
     }
 
     /**
-     * Проверить наличие опций в списке.
-     *
-     * @param expectedOptions ожидаемые опции
+     * Выполняет поиск значения в модальном окне.
      */
-    @Step("Проверить, что '{this.componentName}' содержит опции: {expectedOptions}")
-    public ModalWindow shouldHaveOptions(List<String> expectedOptions) {
-        openDropdown();
+    @Step("Поиск значения '{value}' в модальном окне")
+    public ModalWindow search(String value) {
+        searchInput.shouldBe(visible);
+        searchInput.clear();
+        searchInput.fill(value);
 
-        // Проверяем коллекцию элементов в выпадающем слое
-        $$x(DROPDOWN_LAYER_XPATH + OPTIONS_XPATH)
-                .shouldHave(textsInAnyOrder(expectedOptions));
+        // Логика проверки результатов из легаси:
+        // Если результат не появился сразу, жмем кнопку "Поиск"
+        String resultXpath = String.format("//*[@class='ant-drawer-body']//*[@class='ant-card-body']//*[text()[contains(.,'%s')]]", value);
 
-        // Закрываем список кликом по триггеру или ESC (если нужно)
-        // trigger.click();
+        if (!$x(resultXpath).exists()) {
+            if (searchButton.exists() && searchButton.isDisplayed()) {
+                searchButton.click();
+            }
+            // Ждем появления результатов
+            $x(resultXpath).shouldBe(visible, Duration.ofSeconds(10));
+        }
+
         return this;
     }
 
     /**
-     * Очистить значение (если доступно).
+     * Кликает по найденному значению.
      */
-    @Step("Очистить значение в '{this.componentName}'")
-    public ModalWindow clear() {
-        trigger.hover(); // Крестик часто появляется только при ховере
-        if (clearIcon.isDisplayed()) {
-            clearIcon.click();
-        } else {
-            logger.warn("Иконка очистки не найдена в '{}'", getComponentName());
-        }
+    @Step("Выбрать значение '{value}' из результатов")
+    public ModalWindow selectResult(String value) {
+        String resultXpath = String.format("//*[@class='ant-drawer-body']//*[@class='ant-card-body']//*[text()[contains(.,'%s')]]", value);
+
+        ElementsCollection results = $$x(resultXpath);
+        results.shouldHave(sizeGreaterThan(0));
+
+        // В легаси коде брался последний элемент (raws.get(raws.size() - 1))
+        SelenideElement targetElement = results.last();
+
+        new Button("Результат поиска: " + value, targetElement).click();
+
+        // Ждем исчезновения инпута (признак закрытия модалки при одиночном выборе)
+        // Если это мультиселект, это ожидание может быть лишним, но для single select оно нужно
         return this;
     }
 
     /**
-     * Приватный метод для открытия списка.
-     * Проверяет, открыт ли он уже, чтобы не закрыть кликом.
+     * Полный цикл: Открыть -> Найти -> Выбрать (Single Select).
      */
-    private void openDropdown() {
-        // Проверяем, есть ли видимый слой дропдауна
-        boolean isOpened = $$x(DROPDOWN_LAYER_XPATH).filter(visible).size() > 0;
+    @Step("Выбрать '{value}' через модальное окно")
+    public void select(String value) {
+        open();
+        search(value);
+        selectResult(value);
+        ensureModalClosed();
+    }
 
-        if (!isOpened) {
-            logger.info("Открытие выпадающего списка '{}'", getComponentName());
-            trigger.click();
-            // Ждем появления слоя
-            $$x(DROPDOWN_LAYER_XPATH).shouldHave(size(1), Duration.ofSeconds(4));
+    /**
+     * Множественный выбор: Открыть -> (Найти -> Выбрать) * N -> Применить.
+     */
+    @Step("Выбрать несколько значений: {values}")
+    public void multiSelect(String... values) {
+        open();
+
+        for (String value : values) {
+            search(value);
+            selectResult(value);
+            // Очищаем поиск для следующей итерации, если нужно
+            searchInput.clear();
         }
+
+        applyButton.click();
+        ensureModalClosed();
+    }
+
+    /**
+     * Закрыть модальное окно вручную (через крестик).
+     */
+    @Step("Закрыть модальное окно")
+    public void close() {
+        if (closeButton.isDisplayed()) {
+            closeButton.click();
+            ensureModalClosed();
+        }
+    }
+
+    /**
+     * Вспомогательный метод проверки закрытия окна.
+     */
+    private void ensureModalClosed() {
+        searchInput.getElement().should(disappear, Duration.ofSeconds(5));
+        $(".ant-drawer-mask").should(disappear); // Ждем исчезновения затемнения
     }
 }
