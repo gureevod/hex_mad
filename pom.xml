@@ -35,6 +35,12 @@
         <assertj.version>3.25.3</assertj.version>
         <mockito.version>5.12.0</mockito.version>
         <aspectj.version>1.9.22</aspectj.version>
+        
+        <!-- Database Dependency Versions -->
+        <hikaricp.version>5.1.0</hikaricp.version>
+        <postgresql.version>42.7.3</postgresql.version>
+        <h2.version>2.2.224</h2.version>
+        
         <!-- Plugin Versions -->
         <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
         <maven.surefire.plugin.version>3.1.2</maven.surefire.plugin.version>
@@ -46,8 +52,8 @@
     <modules>
         <module>hex-core</module>
         <module>hex-core-api</module>
+        <module>hex-core-db</module>
         <module>hex-core-ui</module>
-        <module>hex-core-testing</module>
         <module>hex-project-samples</module>
     </modules>
 
@@ -67,6 +73,11 @@
             <dependency>
                 <groupId>com.company.hex</groupId>
                 <artifactId>hex-core-ui</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.company.hex</groupId>
+                <artifactId>hex-core-db</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -183,6 +194,23 @@
                 <version>${assertj.version}</version>
             </dependency>
 
+            <!-- Database -->
+            <dependency>
+                <groupId>com.zaxxer</groupId>
+                <artifactId>HikariCP</artifactId>
+                <version>${hikaricp.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.h2database</groupId>
+                <artifactId>h2</artifactId>
+                <version>${h2.version}</version>
+            </dependency>
+
             <!-- Mocking -->
             <dependency>
                 <groupId>org.mockito</groupId>
@@ -266,7 +294,6 @@
                     <version>${checkstyle.plugin.version}</version>
                     <configuration>
                         <configLocation>google_checks.xml</configLocation>
-                        <encoding>UTF-8</encoding>
                         <consoleOutput>true</consoleOutput>
                         <failsOnError>true</failsOnError>
                         <linkXRef>false</linkXRef>

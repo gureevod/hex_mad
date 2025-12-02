@@ -4,4 +4,5 @@
 - Epic 3: UI Wrappers and Composite Component Pattern — Provide extensible Selenide wrappers and base composite component abstractions; deliver sample `hex-project` usage demonstrating PageObject composition and assertions.
 - Epic 4: CI/CD Quickstart and Observability — Ship `Jenkinsfile.groovy` with parallel matrix, Allure publish, and artifacts; define log redaction and Owner profiles; provide Vault retrieval pattern documentation.
 - Epic 5: Migration Toolkit and Compatibility — Document incremental adoption paths; supply compatibility matrix and migration guidance from ad hoc frameworks to `hex-core` abstractions.
+- Epic 6: Database Layer — Declarative DB Module — Реализовать декларативный модуль `hex-core-db` для работы с базами данных в тестах через аннотированные интерфейсы; обеспечить потокобезопасность, автоматический маппинг, валидацию SQL, транзакции и систему интерцепторов.
 

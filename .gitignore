@@ -7,6 +7,7 @@ hex-core-testing/target/*
 hex-core-ui/target/*
 hex-core-common/target/*
 hex-project-samples/target/*
+hex-core-db/target/*
 hex-project-samples/allure-results/*
 hex-automation-framework/target/*
 hex-project-samples/.allure/
