@@ -4,10 +4,11 @@
  * <p>Содержит аннотации для определения параметров методов репозитория:</p>
  *
  * <ul>
- *     <li>{@code @Param} — именованный параметр запроса</li>
- *     <li>{@code @ParamList} — коллекция для IN clause</li>
- *     <li>{@code @NullableParam} — nullable параметр</li>
- *     <li>{@code @OutParam} — выходной параметр для stored procedures</li>
+ *     <li>{@link com.company.hex.db.annotations.param.Param @Param} — именованный параметр запроса</li>
+ *     <li>{@link com.company.hex.db.annotations.param.ParamList @ParamList} — коллекция для IN clause</li>
+ *     <li>{@link com.company.hex.db.annotations.param.NullableParam @NullableParam} — nullable параметр</li>
+ *     <li>{@link com.company.hex.db.annotations.param.OutParam @OutParam} — выходной параметр для stored procedures</li>
+ *     <li>{@link com.company.hex.db.annotations.param.InOutParam @InOutParam} — входной-выходной параметр для stored procedures</li>
  * </ul>
  *
  * <h2>Пример использования</h2>

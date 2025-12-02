@@ -4,12 +4,13 @@
  * <p>Содержит аннотации для декларативного определения SQL операций:</p>
  *
  * <ul>
- *     <li>{@code @Select} — SELECT запросы</li>
- *     <li>{@code @Insert} — INSERT запросы</li>
- *     <li>{@code @Update} — UPDATE запросы</li>
- *     <li>{@code @Delete} — DELETE запросы</li>
- *     <li>{@code @ReturnGeneratedKeys} — возврат сгенерированных ключей</li>
- *     <li>{@code @Script} — выполнение SQL скриптов из файлов</li>
+ *     <li>{@link com.company.hex.db.annotations.query.Select @Select} — SELECT запросы</li>
+ *     <li>{@link com.company.hex.db.annotations.query.Insert @Insert} — INSERT запросы</li>
+ *     <li>{@link com.company.hex.db.annotations.query.Update @Update} — UPDATE запросы</li>
+ *     <li>{@link com.company.hex.db.annotations.query.Delete @Delete} — DELETE запросы</li>
+ *     <li>{@link com.company.hex.db.annotations.query.ReturnGeneratedKeys @ReturnGeneratedKeys} — возврат сгенерированных ключей</li>
+ *     <li>{@link com.company.hex.db.annotations.query.Script @Script} — выполнение SQL скриптов из файлов</li>
+ *     <li>{@link com.company.hex.db.annotations.query.DangerousQuery @DangerousQuery} — подтверждение опасных операций</li>
  * </ul>
  *
  * <h2>Пример использования</h2>

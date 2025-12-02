@@ -87,7 +87,7 @@ hex-core-db/
 ## Story 6.2: Core Annotations — Query and Mapping
 
 ### Status
-Not Started
+Ready to implement
 
 ### Story
 **As an** API test developer,
