@@ -3,6 +3,7 @@ package com.company.hex.ui.core;
 import com.codeborne.selenide.SelenideElement;
 import com.codeborne.selenide.WebElementCondition;
 import com.company.hex.core.logging.HexLoggerFactory;
+import com.company.hex.ui.interceptor.ActionContext;
 import com.company.hex.ui.interceptor.ElementInterceptor;
 import com.company.hex.ui.interceptor.ElementInterceptorRegistry;
 import io.qameta.allure.Step;
@@ -121,19 +122,19 @@ public abstract class BaseElement {
     
     /**
      * Получить имя страницы.
-     * 
+     *
      * @return имя страницы или "Unknown Page"
      */
-    protected String getPageName() {
+    public String getPageName() {
         return pageName != null ? pageName : "Unknown Page";
     }
     
     /**
      * Получить имя компонента.
-     * 
+     *
      * @return имя компонента или "Root"
      */
-    protected String getComponentName() {
+    public String getComponentName() {
         return componentName != null ? componentName : "Root";
     }
     
@@ -180,79 +181,30 @@ public abstract class BaseElement {
         }
         return (T) this;
     }
-    
+
     /**
-     * Выполнить действие с вызовом interceptors.
-     * Используется для оборачивания любых действий с элементами.
+     * Выполнить действие через цепочку interceptors.
      *
-     * @param <R> тип результата действия
-     * @param actionName имя действия для логирования и interceptors
+     * @param <R> тип результата
+     * @param actionName имя действия
      * @param args аргументы действия
      * @param action действие для выполнения
      * @return результат действия
      */
     protected <R> R executeWithInterceptors(String actionName, Object[] args, Supplier<R> action) {
-        // Проверяем, есть ли зарегистрированные interceptors
-        if (!ElementInterceptorRegistry.hasInterceptors()) {
-            // Если нет interceptors, просто выполняем действие
-            return action.get();
-        }
-        
-        List<ElementInterceptor> interceptors = ElementInterceptorRegistry.getAll();
-        
-        // Вызов beforeAction у всех interceptors
-        for (ElementInterceptor interceptor : interceptors) {
-            try {
-                interceptor.beforeAction(this, actionName, args);
-            } catch (Exception e) {
-                logger.warn("Interceptor beforeAction ошибка для '{}': {}",
-                    interceptor.getClass().getSimpleName(), e.getMessage());
-            }
-        }
-        
-        R result = null;
-        Exception error = null;
-        
-        // Выполнение действия
-        try {
-            result = action.get();
-        } catch (Exception e) {
-            error = e;
-        }
-        
-        // Вызов afterAction или onError у всех interceptors
-        for (ElementInterceptor interceptor : interceptors) {
-            try {
-                if (error == null) {
-                    interceptor.afterAction(this, actionName, result);
-                } else {
-                    interceptor.onError(this, actionName, error);
-                }
-            } catch (Exception e) {
-                logger.warn("Interceptor {} ошибка для '{}': {}",
-                    error == null ? "afterAction" : "onError",
-                    interceptor.getClass().getSimpleName(),
-                    e.getMessage());
-            }
-        }
-        
-        // Если произошла ошибка, пробрасываем её дальше
-        if (error != null) {
-            if (error instanceof RuntimeException) {
-                throw (RuntimeException) error;
-            }
-            throw new RuntimeException(error);
-        }
-        
-        return result;
+        ActionContext context = ActionContext.builder()
+                .element(this)
+                .actionName(actionName)
+                .args(args)
+                .attribute("pageName", getPageName())
+                .attribute("componentName", getComponentName())
+                .build();
+
+        return ElementInterceptorRegistry.execute(context, action);
     }
-    
+
     /**
-     * Упрощенная версия executeWithInterceptors для void методов.
-     *
-     * @param actionName имя действия
-     * @param args аргументы действия
-     * @param action действие для выполнения
+     * Упрощенная версия для void методов.
      */
     protected void executeWithInterceptors(String actionName, Object[] args, Runnable action) {
         executeWithInterceptors(actionName, args, () -> {

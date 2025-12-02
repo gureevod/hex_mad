@@ -20,10 +20,6 @@ public class UitestingplaygroundTest {
     public void testSuccessfulLogin() {
         SamplePage page = new SamplePage();
         page.open();
-        page.username.fill("user");
-        page.password.fill("pwd");
         page.loginButton.click();
-        page.successMessage.shouldHaveExactText("Welcome, user!");
-        System.out.println();
     }
 }

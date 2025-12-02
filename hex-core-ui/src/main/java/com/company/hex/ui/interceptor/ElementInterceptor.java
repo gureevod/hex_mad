@@ -1,65 +1,40 @@
 package com.company.hex.ui.interceptor;
 
 import com.company.hex.ui.core.BaseElement;
+import java.util.function.Supplier;
 
 /**
  * Interceptor для перехвата действий с UI элементами.
- * Позволяет добавить логику до/после действия или при ошибке.
- * 
- * <p>Примеры использования:</p>
- * <ul>
- *   <li>Автоматические скриншоты при ошибках</li>
- *   <li>Сбор метрик производительности</li>
- *   <li>Дополнительное логирование</li>
- *   <li>Retry логика для нестабильных элементов</li>
- * </ul>
- * 
- * @author Hex Framework
- * @version 1.0
- * @since 1.0
+ * Использует паттерн Chain of Responsibility для гибкого контроля.
  */
 public interface ElementInterceptor {
-    
+
     /**
-     * Вызывается до выполнения действия.
-     * 
-     * @param element элемент, над которым выполняется действие
-     * @param actionName имя действия (click, fill, shouldBe и т.д.)
-     * @param args аргументы действия (может быть пустым массивом)
+     * Перехватывает выполнение действия.
+     * Interceptor может:
+     * - Выполнить логику до/после действия
+     * - Модифицировать результат
+     * - Реализовать retry-логику
+     * - Пропустить действие полностью
+     *
+     * @param context контекст действия
+     * @param chain цепочка для продолжения выполнения
+     * @param <R> тип результата
+     * @return результат действия
      */
-    default void beforeAction(BaseElement element, String actionName, Object[] args) {
-        // По умолчанию ничего не делаем
-    }
-    
-    /**
-     * Вызывается после успешного выполнения действия.
-     * 
-     * @param element элемент, над которым выполнялось действие
-     * @param actionName имя действия
-     * @param result результат действия (может быть null для void методов)
-     */
-    default void afterAction(BaseElement element, String actionName, Object result) {
-        // По умолчанию ничего не делаем
-    }
-    
-    /**
-     * Вызывается при ошибке во время выполнения действия.
-     * 
-     * @param element элемент, над которым выполнялось действие
-     * @param actionName имя действия
-     * @param exception исключение, которое произошло
-     */
-    default void onError(BaseElement element, String actionName, Exception exception) {
-        // По умолчанию ничего не делаем
-    }
-    
+    <R> R intercept(ActionContext context, ActionChain<R> chain);
+
     /**
      * Приоритет interceptor'а. Меньше значение = раньше выполняется.
-     * По умолчанию 100.
-     * 
-     * @return приоритет
      */
     default int getOrder() {
         return 100;
+    }
+
+    /**
+     * Проверяет, должен ли interceptor обрабатывать данное действие.
+     */
+    default boolean supports(String actionName) {
+        return true;
     }
 }

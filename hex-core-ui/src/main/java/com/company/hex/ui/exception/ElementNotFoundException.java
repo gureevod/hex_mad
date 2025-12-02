@@ -1,201 +1,203 @@
 package com.company.hex.ui.exception;
 
+import java.io.Serial;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Исключение при ненайденном элементе с детальной диагностикой.
- * Предоставляет контекстную информацию и подсказки для решения проблемы.
- * 
- * @author Hex Framework
- * @version 1.0
- * @since 1.0
  */
 public class ElementNotFoundException extends RuntimeException {
-    
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
+    private static final int BOX_WIDTH = 68;
+    private static final DateTimeFormatter TIME_FMT =
+            DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
+
     private final String elementName;
     private final String locator;
     private final String pageName;
     private final String componentName;
-    private final String suggestions;
-    
-    /**
-     * Создать исключение с полной контекстной информацией.
-     * 
-     * @param elementName имя элемента
-     * @param locator локатор элемента
-     * @param pageName имя страницы
-     * @param componentName имя компонента (может быть null)
-     * @param cause исходное исключение
-     */
-    public ElementNotFoundException(String elementName, String locator, 
-                                    String pageName, String componentName,
-                                    Throwable cause) {
-        super(buildMessage(elementName, locator, pageName, componentName), cause);
-        this.elementName = elementName;
-        this.locator = locator;
-        this.pageName = pageName;
-        this.componentName = componentName;
-        this.suggestions = generateSuggestions(locator);
+    private final Duration timeout;
+    private final String currentUrl;
+    private final String pageTitle;
+    private final LocalDateTime timestamp;
+
+    // Private constructor - используй Builder
+    private ElementNotFoundException(Builder b, String message) {
+        super(message, b.cause);
+        this.elementName = b.elementName != null ? b.elementName : "Unknown";
+        this.locator = b.locator != null ? b.locator : "Unknown";
+        this.pageName = b.pageName != null ? b.pageName : "Unknown Page";
+        this.componentName = b.componentName;
+        this.timeout = b.timeout;
+        this.currentUrl = b.currentUrl;
+        this.pageTitle = b.pageTitle;
+        this.timestamp = LocalDateTime.now();
     }
-    
-    /**
-     * Создать исключение без исходной причины.
-     * 
-     * @param elementName имя элемента
-     * @param locator локатор элемента
-     * @param pageName имя страницы
-     * @param componentName имя компонента (может быть null)
-     */
-    public ElementNotFoundException(String elementName, String locator, 
-                                    String pageName, String componentName) {
-        this(elementName, locator, pageName, componentName, null);
+
+    public static Builder builder() {
+        return new Builder();
     }
-    
-    /**
-     * Построить детальное сообщение об ошибке.
-     * 
-     * @param elementName имя элемента
-     * @param locator локатор
-     * @param pageName имя страницы
-     * @param componentName имя компонента
-     * @return форматированное сообщение
-     */
-    private static String buildMessage(String elementName, String locator,
-                                       String pageName, String componentName) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("\n╔════════════════════════════════════════════════════════════════╗\n");
-        sb.append("║                    ЭЛЕМЕНТ НЕ НАЙДЕН                           ║\n");
-        sb.append("╠════════════════════════════════════════════════════════════════╣\n");
-        sb.append(String.format("║ Элемент:   %-50s ║\n", truncate(elementName, 50)));
-        sb.append(String.format("║ Страница:  %-50s ║\n", truncate(pageName, 50)));
-        sb.append(String.format("║ Компонент: %-50s ║\n", truncate(componentName != null ? componentName : "Root", 50)));
-        sb.append("║ Локатор:                                                       ║\n");
-        
-        // Разбиваем длинный локатор на строки
-        String[] locatorLines = splitLocator(locator, 60);
-        for (String line : locatorLines) {
-            sb.append(String.format("║   %-60s ║\n", line));
+
+    public static class Builder {
+        private String elementName;
+        private String locator;
+        private String pageName;
+        private String componentName;
+        private Duration timeout;
+        private Throwable cause;
+        private String currentUrl;
+        private String pageTitle;
+
+        public Builder elementName(String val) { this.elementName = val; return this; }
+        public Builder locator(String val) { this.locator = val; return this; }
+        public Builder pageName(String val) { this.pageName = val; return this; }
+        public Builder componentName(String val) { this.componentName = val; return this; }
+        public Builder timeout(Duration val) { this.timeout = val; return this; }
+        public Builder cause(Throwable val) { this.cause = val; return this; }
+        public Builder currentUrl(String val) { this.currentUrl = val; return this; }
+        public Builder pageTitle(String val) { this.pageTitle = val; return this; }
+
+        public ElementNotFoundException build() {
+            String message = buildMessage(this);
+            return new ElementNotFoundException(this, message);
         }
-        
-        sb.append("╚════════════════════════════════════════════════════════════════╝");
-        return sb.toString();
-    }
-    
-    /**
-     * Генерировать подсказки для решения проблемы.
-     * 
-     * @param locator локатор элемента
-     * @return строка с подсказками
-     */
-    private static String generateSuggestions(String locator) {
-        StringBuilder suggestions = new StringBuilder("\n📋 Возможные причины:\n");
-        
-        if (locator.startsWith("//") || locator.startsWith(".//")) {
-            suggestions.append("  • Проверьте правильность XPath выражения\n");
-            suggestions.append("  • Убедитесь, что элемент не находится в iframe\n");
+
+        private static String buildMessage(Builder b) {
+            StringBuilder sb = new StringBuilder();
+
+            sb.append("\n");
+            sb.append("╔").append("═".repeat(BOX_WIDTH - 2)).append("╗\n");
+            sb.append(centered("🔍 ЭЛЕМЕНТ НЕ НАЙДЕН"));
+            sb.append("╠").append("═".repeat(BOX_WIDTH - 2)).append("╣\n");
+
+            sb.append(labeled("Элемент", b.elementName));
+            sb.append(labeled("Страница", b.pageName));
+
+            if (b.componentName != null && !b.componentName.isEmpty()) {
+                sb.append(labeled("Компонент", b.componentName));
+            }
+
+            if (b.timeout != null) {
+                sb.append(labeled("Timeout", formatDuration(b.timeout)));
+            }
+
+            sb.append(labeled("Время", LocalDateTime.now().format(TIME_FMT)));
+
+            if (b.currentUrl != null) {
+                sb.append("╠").append("═".repeat(BOX_WIDTH - 2)).append("╣\n");
+                sb.append(labeled("URL", b.currentUrl));
+            }
+
+            if (b.pageTitle != null) {
+                sb.append(labeled("Title", b.pageTitle));
+            }
+
+            // Локатор
+            sb.append("╠").append("═".repeat(BOX_WIDTH - 2)).append("╣\n");
+            sb.append(left("Локатор:"));
+
+            if (b.locator != null) {
+                for (String line : wrapText(b.locator, BOX_WIDTH - 8)) {
+                    sb.append(left("  " + line));
+                }
+            }
+
+            sb.append("╚").append("═".repeat(BOX_WIDTH - 2)).append("╝\n");
+
+            // Подсказки
+            sb.append("\n📋 Возможные причины:\n");
+            for (String tip : generateTips(b.locator)) {
+                sb.append("  • ").append(tip).append("\n");
+            }
+
+            return sb.toString();
         }
-        
-        if (locator.contains("@id=")) {
-            suggestions.append("  • ID может быть динамическим - используйте contains(@id, '...')\n");
+
+        private static String centered(String text) {
+            int padding = (BOX_WIDTH - 2 - text.length()) / 2;
+            String padded = " ".repeat(Math.max(0, padding)) + text;
+            return String.format("║%-" + (BOX_WIDTH - 2) + "s║\n", padded);
         }
-        
-        if (locator.contains("@class=")) {
-            suggestions.append("  • Классы могут меняться - используйте contains(@class, '...')\n");
+
+        private static String left(String text) {
+            String t = text.length() > BOX_WIDTH - 4
+                    ? text.substring(0, BOX_WIDTH - 7) + "..."
+                    : text;
+            return String.format("║ %-" + (BOX_WIDTH - 4) + "s ║\n", t);
         }
-        
-        if (locator.contains("[@") || locator.contains("[text()")) {
-            suggestions.append("  • Проверьте точность условий в квадратных скобках\n");
+
+        private static String labeled(String label, String value) {
+            String val = value != null ? value : "N/A";
+            String prefix = label + ": ";
+            int maxLen = BOX_WIDTH - 4 - prefix.length();
+            String displayVal = val.length() > maxLen
+                    ? val.substring(0, maxLen - 3) + "..."
+                    : val;
+            return String.format("║ %s%-" + maxLen + "s ║\n", prefix, displayVal);
         }
-        
-        suggestions.append("  • Элемент может загружаться асинхронно - увеличьте timeout\n");
-        suggestions.append("  • Элемент может быть скрыт (display:none или visibility:hidden)\n");
-        suggestions.append("  • Проверьте, не находится ли элемент в Shadow DOM\n");
-        suggestions.append("  • Используйте инструменты разработчика браузера для проверки локатора\n");
-        
-        return suggestions.toString();
-    }
-    
-    /**
-     * Обрезать строку до максимальной длины.
-     * 
-     * @param str строка
-     * @param maxLength максимальная длина
-     * @return обрезанная строка
-     */
-    private static String truncate(String str, int maxLength) {
-        if (str == null) return "";
-        if (str.length() <= maxLength) return str;
-        return str.substring(0, maxLength - 3) + "...";
-    }
-    
-    /**
-     * Разбить длинный локатор на строки.
-     * 
-     * @param locator локатор
-     * @param maxLength максимальная длина строки
-     * @return массив строк
-     */
-    private static String[] splitLocator(String locator, int maxLength) {
-        if (locator.length() <= maxLength) {
-            return new String[] { locator };
+
+        private static List<String> wrapText(String text, int maxWidth) {
+            if (text == null) return List.of("N/A");
+
+            List<String> lines = new ArrayList<>();
+            int start = 0;
+            while (start < text.length()) {
+                int end = Math.min(start + maxWidth, text.length());
+                lines.add(text.substring(start, end));
+                start = end;
+            }
+            return lines;
         }
-        
-        java.util.List<String> lines = new java.util.ArrayList<>();
-        int start = 0;
-        while (start < locator.length()) {
-            int end = Math.min(start + maxLength, locator.length());
-            lines.add(locator.substring(start, end));
-            start = end;
+
+        private static String formatDuration(Duration d) {
+            if (d == null) return "N/A";
+            long ms = d.toMillis();
+            return ms < 1000 ? ms + "ms" : String.format("%.1fs", ms / 1000.0);
         }
-        
-        return lines.toArray(new String[0]);
+
+        private static List<String> generateTips(String locator) {
+            List<String> tips = new ArrayList<>();
+
+            if (locator != null) {
+                if (locator.contains("@id=") && !locator.contains("contains")) {
+                    tips.add("ID может быть динамическим - используйте contains(@id, '...')");
+                }
+                if (locator.contains("@class=") && !locator.contains("contains")) {
+                    tips.add("Классы могут меняться - используйте contains(@class, '...')");
+                }
+            }
+
+            tips.add("Элемент может загружаться асинхронно - увеличьте timeout");
+            tips.add("Элемент может быть скрыт (display:none)");
+            tips.add("Проверьте, не находится ли элемент в iframe");
+            tips.add("Используйте DevTools для проверки локатора");
+
+            return tips;
+        }
     }
-    
+
+    // Getters
+    public String getElementName() { return elementName; }
+    public String getLocator() { return locator; }
+    public String getPageName() { return pageName; }
+    public String getComponentName() { return componentName; }
+    public Duration getTimeout() { return timeout; }
+    public String getCurrentUrl() { return currentUrl; }
+    public String getPageTitle() { return pageTitle; }
+    public LocalDateTime getTimestamp() { return timestamp; }
+
     /**
-     * Получить подсказки для решения проблемы.
-     * 
-     * @return строка с подсказками
+     * Краткое сообщение для логов.
      */
-    public String getSuggestions() {
-        return suggestions;
-    }
-    
-    /**
-     * Получить имя элемента.
-     * 
-     * @return имя элемента
-     */
-    public String getElementName() {
-        return elementName;
-    }
-    
-    /**
-     * Получить локатор элемента.
-     * 
-     * @return локатор
-     */
-    public String getLocator() {
-        return locator;
-    }
-    
-    /**
-     * Получить имя страницы.
-     * 
-     * @return имя страницы
-     */
-    public String getPageName() {
-        return pageName;
-    }
-    
-    /**
-     * Получить имя компонента.
-     * 
-     * @return имя компонента
-     */
-    public String getComponentName() {
-        return componentName;
-    }
-    
-    @Override
-    public String getMessage() {
-        return super.getMessage() + suggestions;
+    public String getShortMessage() {
+        return String.format("Element '%s' not found on page '%s' [%s]",
+                elementName, pageName, locator);
     }
 }

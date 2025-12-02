@@ -3,6 +3,10 @@ package com.company.hex.project.junit5;
 import com.codeborne.selenide.Selenide;
 import com.codeborne.selenide.logevents.SelenideLogger;
 import com.company.hex.ui.core.WebDriverFactory;
+import com.company.hex.ui.interceptor.ElementInterceptorRegistry;
+import com.company.hex.ui.interceptor.ErrorHandlingInterceptor;
+import com.company.hex.ui.interceptor.LoggingInterceptor;
+import com.company.hex.ui.interceptor.RetryInterceptor;
 import io.qameta.allure.selenide.AllureSelenide;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
@@ -38,6 +42,9 @@ public class UiExtension implements BeforeAllCallback, AfterEachCallback {
                             .screenshots(true)
                             .savePageSource(true));
         }
+
+        ElementInterceptorRegistry.register(new LoggingInterceptor());
+        ElementInterceptorRegistry.register(new RetryInterceptor(3));
     }
 
     @Override
