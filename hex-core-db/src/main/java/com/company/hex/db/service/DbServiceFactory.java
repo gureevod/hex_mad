@@ -1,13 +1,19 @@
 package com.company.hex.db.service;
 
 import com.company.hex.db.annotations.config.DbService;
+import com.company.hex.db.config.DbConfig;
+import com.company.hex.db.connection.ConnectionProvider;
+import com.company.hex.db.connection.DataSourceConfig;
+import com.company.hex.db.exception.ConnectionException;
 import com.company.hex.db.exception.DbException;
 import com.company.hex.db.interceptor.DbInterceptor;
 import com.company.hex.db.validation.QueryValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.lang.reflect.Proxy;
+import java.sql.Connection;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -207,7 +213,7 @@ public final class DbServiceFactory {
      * @return QueryExecutor или null если не сконфигурирован
      */
     public static QueryExecutor getQueryExecutor() {
-        // TODO: Implement when ConnectionProvider is ready
+        // TODO: Implement when QueryExecutor implementation is ready
         logger.debug("Getting QueryExecutor");
         return null;
     }
@@ -221,5 +227,139 @@ public final class DbServiceFactory {
      */
     public static QueryProcessor getQueryProcessor() {
         return new QueryProcessor();
+    }
+
+    // ==================== Escape Hatch: Connection Access ====================
+
+    /**
+     * Возвращает ConnectionProvider для прямого управления соединениями.
+     *
+     * <p>Это "escape hatch" для сценариев, требующих прямого доступа
+     * к пулу соединений или управления транзакциями вручную.</p>
+     *
+     * @return экземпляр ConnectionProvider
+     */
+    public static ConnectionProvider getConnectionProvider() {
+        return ConnectionProvider.getInstance();
+    }
+
+    /**
+     * Получает соединение из указанного DataSource.
+     *
+     * <p>Это "escape hatch" для прямого доступа к соединению.
+     * Соединение должно быть закрыто после использования.</p>
+     *
+     * <h2>Пример использования</h2>
+     * <pre>{@code
+     * try (Connection conn = DbServiceFactory.getConnection("primary")) {
+     *     PreparedStatement ps = conn.prepareStatement("SELECT * FROM users");
+     *     // ...
+     * }
+     * }</pre>
+     *
+     * @param dataSourceName имя DataSource
+     * @return соединение с базой данных
+     * @throws ConnectionException если соединение не может быть получено
+     */
+    public static Connection getConnection(String dataSourceName) {
+        ConnectionProvider provider = ConnectionProvider.getInstance();
+        if (!provider.isInitialized()) {
+            throw new ConnectionException(
+                "ConnectionProvider is not initialized. "
+                    + "Register a DataSource first using registerDataSource()");
+        }
+        return provider.getConnection(dataSourceName);
+    }
+
+    /**
+     * Получает соединение из DataSource по умолчанию ("primary").
+     *
+     * @return соединение с базой данных
+     * @throws ConnectionException если соединение не может быть получено
+     */
+    public static Connection getConnection() {
+        return getConnection("primary");
+    }
+
+    /**
+     * Возвращает DataSource по имени.
+     *
+     * @param dataSourceName имя DataSource
+     * @return DataSource или null если не найден
+     */
+    public static DataSource getDataSource(String dataSourceName) {
+        return ConnectionProvider.getInstance().getDataSource(dataSourceName);
+    }
+
+    /**
+     * Возвращает DataSource по умолчанию ("primary").
+     *
+     * @return DataSource или null если не найден
+     */
+    public static DataSource getDataSource() {
+        return getDataSource("primary");
+    }
+
+    /**
+     * Регистрирует DataSource с указанной конфигурацией.
+     *
+     * <p>Должен быть вызван перед использованием репозиториев.</p>
+     *
+     * @param name имя DataSource
+     * @param config конфигурация DataSource
+     */
+    public static void registerDataSource(String name, DataSourceConfig config) {
+        ConnectionProvider.getInstance().registerDataSource(name, config);
+        logger.info("DataSource '{}' зарегистрирован через DbServiceFactory", name);
+    }
+
+    /**
+     * Регистрирует DataSource на основе DbConfig.
+     *
+     * @param name имя DataSource
+     * @param dbConfig конфигурация из hex.properties
+     */
+    public static void registerDataSource(String name, DbConfig dbConfig) {
+        ConnectionProvider.getInstance().registerDataSource(name, dbConfig);
+        logger.info("DataSource '{}' зарегистрирован через DbServiceFactory", name);
+    }
+
+    /**
+     * Регистрирует DataSource для H2 in-memory базы данных.
+     *
+     * <p>Удобно для тестов без внешних зависимостей.</p>
+     *
+     * @param name имя DataSource
+     */
+    public static void registerH2DataSource(String name) {
+        DataSourceConfig config = DataSourceConfig.h2InMemory(name);
+        registerDataSource(name, config);
+    }
+
+    /**
+     * Регистрирует primary DataSource для H2 in-memory.
+     */
+    public static void registerH2DataSource() {
+        registerH2DataSource("primary");
+    }
+
+    /**
+     * Проверяет, инициализирован ли ConnectionProvider.
+     *
+     * @return true если есть зарегистрированные DataSource
+     */
+    public static boolean isInitialized() {
+        return ConnectionProvider.getInstance().isInitialized();
+    }
+
+    /**
+     * Завершает работу всех пулов соединений.
+     *
+     * <p>Вызывается при завершении тестов или приложения.</p>
+     */
+    public static void shutdown() {
+        ConnectionProvider.getInstance().shutdown();
+        clearCache();
+        logger.info("DbServiceFactory shutdown complete");
     }
 }
