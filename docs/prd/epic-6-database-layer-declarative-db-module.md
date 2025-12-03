@@ -87,7 +87,7 @@ hex-core-db/
 ## Story 6.2: Core Annotations — Query and Mapping
 
 ### Status
-Ready to implement
+Done
 
 ### Story
 **As an** API test developer,
@@ -172,7 +172,6 @@ Not Started
    - `.addInterceptor(interceptor)`
    - `.withValidator(validator)`
 6. Созданный прокси потокобезопасен.
-7. Unit-тесты для фабрики и прокси.
 
 ### Tasks / Subtasks
 - [ ] Task 1: Реализовать QueryDefinition
