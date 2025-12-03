@@ -154,7 +154,7 @@ public @interface DbService {
 ## Story 6.3: DbServiceFactory and Proxy-Based Architecture
 
 ### Status
-Not Started
+Done
 
 ### Story
 **As a** test developer,
