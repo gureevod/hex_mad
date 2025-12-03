@@ -9,7 +9,10 @@ import com.company.hex.db.exception.QueryExecutionException;
 import com.company.hex.db.exception.QueryTimeoutException;
 import com.company.hex.db.exception.UniqueConstraintException;
 import com.company.hex.db.interceptor.ExecutionContext;
+import com.company.hex.db.mapping.EntityMetadata;
 import com.company.hex.db.mapping.RowMapper;
+import com.company.hex.db.mapping.RowMapperFactory;
+import com.company.hex.db.mapping.TypeConverter;
 import com.company.hex.db.service.NamedParameterProcessor.ProcessedQuery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -492,12 +495,13 @@ public final class DefaultQueryExecutor implements QueryExecutor {
 
     /**
      * Маппит строку с помощью кастомного RowMapper.
+     * Делегирует в RowMapperFactory для кэширования и переиспользования.
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings("rawtypes")
     private Object mapWithCustomMapper(ResultSet rs, Class<?> mapperClass, int rowNum)
             throws SQLException {
         try {
-            RowMapper mapper = (RowMapper) mapperClass.getDeclaredConstructor().newInstance();
+            RowMapper mapper = RowMapperFactory.forCustomMapperRaw(mapperClass);
             return mapper.mapRow(rs, rowNum);
         } catch (Exception e) {
             throw new MappingException(
@@ -601,29 +605,10 @@ public final class DefaultQueryExecutor implements QueryExecutor {
 
     /**
      * Конвертирует snake_case в camelCase.
+     * Делегирует в EntityMetadata для единообразной конверсии.
      */
     private String snakeToCamel(String snake) {
-        if (snake == null || !snake.contains("_")) {
-            return snake;
-        }
-
-        StringBuilder result = new StringBuilder();
-        boolean capitalizeNext = false;
-
-        for (char c : snake.toCharArray()) {
-            if (c == '_') {
-                capitalizeNext = true;
-            } else {
-                if (capitalizeNext) {
-                    result.append(Character.toUpperCase(c));
-                    capitalizeNext = false;
-                } else {
-                    result.append(Character.toLowerCase(c));
-                }
-            }
-        }
-
-        return result.toString();
+        return EntityMetadata.snakeToCamel(snake);
     }
 
     /**
@@ -670,72 +655,20 @@ public final class DefaultQueryExecutor implements QueryExecutor {
 
     /**
      * Конвертирует значение в нужный тип.
+     * Делегирует в TypeConverter для единообразной конверсии.
      */
-    private Object convertValue(Object value, Class<?> targetType) {
+    @SuppressWarnings("unchecked")
+    private <T> T convertValue(Object value, Class<T> targetType) {
         if (value == null) {
-            return getDefaultValue(targetType);
+            return (T) getDefaultValue(targetType);
         }
 
         if (targetType.isInstance(value)) {
-            return value;
+            return targetType.cast(value);
         }
 
-        // Числовые конверсии
-        if (value instanceof Number number) {
-            if (targetType == Long.class || targetType == long.class) {
-                return number.longValue();
-            }
-            if (targetType == Integer.class || targetType == int.class) {
-                return number.intValue();
-            }
-            if (targetType == Double.class || targetType == double.class) {
-                return number.doubleValue();
-            }
-            if (targetType == Float.class || targetType == float.class) {
-                return number.floatValue();
-            }
-            if (targetType == Short.class || targetType == short.class) {
-                return number.shortValue();
-            }
-            if (targetType == Byte.class || targetType == byte.class) {
-                return number.byteValue();
-            }
-            if (targetType == BigDecimal.class) {
-                return BigDecimal.valueOf(number.doubleValue());
-            }
-        }
-
-        // Timestamp → LocalDateTime
-        if (value instanceof Timestamp ts && targetType == LocalDateTime.class) {
-            return ts.toLocalDateTime();
-        }
-
-        // Date → LocalDate
-        if (value instanceof java.sql.Date date && targetType == LocalDate.class) {
-            return date.toLocalDate();
-        }
-
-        // Time → LocalTime
-        if (value instanceof java.sql.Time time && targetType == LocalTime.class) {
-            return time.toLocalTime();
-        }
-
-        // Boolean
-        if (targetType == Boolean.class || targetType == boolean.class) {
-            if (value instanceof Number n) {
-                return n.intValue() != 0;
-            }
-            if (value instanceof String s) {
-                return Boolean.parseBoolean(s) || "1".equals(s) || "Y".equalsIgnoreCase(s);
-            }
-        }
-
-        // String
-        if (targetType == String.class) {
-            return value.toString();
-        }
-
-        return value;
+        // Делегируем в TypeConverter
+        return TypeConverter.convert(value, targetType);
     }
 
     /**
