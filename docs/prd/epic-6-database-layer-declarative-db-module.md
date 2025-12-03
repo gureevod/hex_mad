@@ -217,7 +217,7 @@ QueryDefinition  QueryExecutor
 ## Story 6.4: Connection Provider and HikariCP Integration
 
 ### Status
-Not Started
+Done
 
 ### Story
 **As a** test developer,
@@ -265,7 +265,7 @@ hex.db.pool.connection-timeout=30000
 ## Story 6.5: Query Executor and JDBC Execution
 
 ### Status
-Not Started
+Done
 
 ### Story
 **As a** framework developer,
