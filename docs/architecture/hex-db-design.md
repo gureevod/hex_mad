@@ -238,6 +238,20 @@ package com.framework.hex.db.builders;
 
 /**
  * Билдер SELECT запросов.
+ * 
+ * <p><b>Thread Safety:</b> Builders are NOT thread-safe and should not be
+ * shared between threads. Each thread should create its own builder instance.
+ * 
+ * <p><b>Usage Pattern:</b>
+ * <pre>{@code
+ * // ✅ Правильно — создаём builder в каждом потоке
+ * List<User> users = Db.selectAll().from("users").toList(mapper);
+ * 
+ * // ❌ Неправильно — не делайте так!
+ * SelectBuilder shared = Db.selectAll().from("users");
+ * // Thread 1: shared.where("a", 1).toList();
+ * // Thread 2: shared.where("b", 2).toList();  // Гонка!
+ * }</pre>
  */
 public class SelectBuilder implements QueryBuilder {
     
@@ -282,10 +296,23 @@ public class SelectBuilder implements QueryBuilder {
     
     // === WHERE ===
     
+    /**
+     * Добавить условие WHERE column = value.
+     * 
+     * <p><b>NULL handling:</b> Если value == null, автоматически 
+     * использует IS NULL вместо = NULL (который всегда false в SQL).
+     */
     public SelectBuilder where(String column, Object value) {
+        if (value == null) {
+            return whereNull(column);
+        }
         return where(column, "=", value);
     }
     
+    /**
+     * Добавить условие WHERE с явным оператором.
+     * Для null значений используйте whereNull() / whereNotNull().
+     */
     public SelectBuilder where(String column, String operator, Object value) {
         String paramName = generateParamName(column);
         whereClauses.add(new WhereClause(column + " " + operator + " :" + paramName, "AND"));
@@ -485,6 +512,8 @@ package com.framework.hex.db.builders;
 
 /**
  * Билдер INSERT запросов.
+ * 
+ * <p><b>Thread Safety:</b> NOT thread-safe. Create a new instance per thread.
  */
 public class InsertBuilder implements QueryBuilder {
     
@@ -540,6 +569,8 @@ package com.framework.hex.db.builders;
 
 /**
  * Билдер UPDATE запросов.
+ * 
+ * <p><b>Thread Safety:</b> NOT thread-safe. Create a new instance per thread.
  */
 public class UpdateBuilder implements QueryBuilder {
     
@@ -570,7 +601,15 @@ public class UpdateBuilder implements QueryBuilder {
         return this;
     }
     
+    /**
+     * Добавить условие WHERE.
+     * Если value == null, использует IS NULL.
+     */
     public UpdateBuilder where(String column, Object value) {
+        if (value == null) {
+            whereClauses.add(column + " IS NULL");
+            return this;
+        }
         String paramName = "w_" + column;
         whereClauses.add(column + " = :" + paramName);
         whereParams.put(paramName, value);
@@ -627,6 +666,8 @@ package com.framework.hex.db.builders;
 
 /**
  * Билдер DELETE запросов.
+ * 
+ * <p><b>Thread Safety:</b> NOT thread-safe. Create a new instance per thread.
  */
 public class DeleteBuilder implements QueryBuilder {
     
@@ -639,6 +680,10 @@ public class DeleteBuilder implements QueryBuilder {
     }
     
     public DeleteBuilder where(String column, Object value) {
+        if (value == null) {
+            whereClauses.add(column + " IS NULL");
+            return this;
+        }
         String paramName = column;
         whereClauses.add(column + " = :" + paramName);
         parameters.put(paramName, value);
@@ -678,7 +723,119 @@ public class DeleteBuilder implements QueryBuilder {
 package com.framework.hex.db.builders;
 
 /**
+ * Билдер для batch INSERT запросов.
+ * Позволяет эффективно вставлять множество строк одним запросом.
+ * 
+ * <p><b>Thread Safety:</b> NOT thread-safe. Create a new instance per thread.
+ * 
+ * <p>Пример использования:
+ * <pre>{@code
+ * Db.batchInsertInto("users")
+ *     .columns("name", "email", "active")
+ *     .row("John", "john@test.com", true)
+ *     .row("Jane", "jane@test.com", true)
+ *     .row("Bob", "bob@test.com", false)
+ *     .execute();
+ * }</pre>
+ */
+public class BatchInsertBuilder {
+    
+    private final String table;
+    private final List<String> columns = new ArrayList<>();
+    private final List<Map<String, Object>> rows = new ArrayList<>();
+    
+    public BatchInsertBuilder(String table) {
+        this.table = table;
+    }
+    
+    /**
+     * Определить колонки для вставки.
+     * Должен быть вызван перед добавлением строк.
+     */
+    public BatchInsertBuilder columns(String... cols) {
+        columns.addAll(Arrays.asList(cols));
+        return this;
+    }
+    
+    /**
+     * Добавить строку со значениями в порядке колонок.
+     * 
+     * @throws IllegalArgumentException если количество значений не совпадает с количеством колонок
+     */
+    public BatchInsertBuilder row(Object... values) {
+        if (columns.isEmpty()) {
+            throw new IllegalStateException("Call columns() before adding rows");
+        }
+        if (values.length != columns.size()) {
+            throw new IllegalArgumentException(
+                "Values count (" + values.length + ") must match columns count (" + columns.size() + ")");
+        }
+        Map<String, Object> row = new LinkedHashMap<>();
+        for (int i = 0; i < columns.size(); i++) {
+            row.put(columns.get(i), values[i]);
+        }
+        rows.add(row);
+        return this;
+    }
+    
+    /**
+     * Добавить строку как Map.
+     */
+    public BatchInsertBuilder row(Map<String, Object> row) {
+        if (columns.isEmpty()) {
+            // Если колонки не заданы — берём из первой строки
+            columns.addAll(row.keySet());
+        }
+        rows.add(new LinkedHashMap<>(row));
+        return this;
+    }
+    
+    /**
+     * Добавить множество строк.
+     */
+    public BatchInsertBuilder rows(List<Map<String, Object>> rows) {
+        for (Map<String, Object> row : rows) {
+            row(row);
+        }
+        return this;
+    }
+    
+    /**
+     * Построить SQL для batch insert.
+     */
+    public String buildSql() {
+        StringBuilder sql = new StringBuilder();
+        sql.append("INSERT INTO ").append(table).append(" (");
+        sql.append(String.join(", ", columns));
+        sql.append(") VALUES (");
+        sql.append(columns.stream().map(c -> ":" + c).collect(Collectors.joining(", ")));
+        sql.append(")");
+        return sql.toString();
+    }
+    
+    /**
+     * Получить список параметров для каждой строки.
+     */
+    public List<Map<String, Object>> getRowsParams() {
+        return Collections.unmodifiableList(rows);
+    }
+    
+    /**
+     * Количество строк для вставки.
+     */
+    public int size() {
+        return rows.size();
+    }
+}
+```
+
+```java
+package com.framework.hex.db.builders;
+
+/**
  * Билдер для сырого SQL.
+ * 
+ * <p><b>Thread Safety:</b> NOT thread-safe. Create a new instance per thread.
  */
 public class RawQueryBuilder implements QueryBuilder {
     
@@ -734,6 +891,87 @@ public class RawQueryBuilder implements QueryBuilder {
 }
 ```
 
+```java
+package com.framework.hex.db.builders;
+
+/**
+ * Парсер SQL скриптов для разбиения на отдельные statements.
+ */
+class SqlScriptParser {
+    
+    /**
+     * Разбить SQL скрипт на отдельные statements.
+     * Учитывает строковые литералы и комментарии.
+     */
+    static List<String> splitStatements(String script) {
+        List<String> statements = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inString = false;
+        boolean inLineComment = false;
+        boolean inBlockComment = false;
+        char stringChar = 0;
+        
+        for (int i = 0; i < script.length(); i++) {
+            char c = script.charAt(i);
+            char next = (i + 1 < script.length()) ? script.charAt(i + 1) : 0;
+            
+            // Обработка комментариев
+            if (!inString && !inBlockComment && c == '-' && next == '-') {
+                inLineComment = true;
+            }
+            if (inLineComment && (c == '\n' || c == '\r')) {
+                inLineComment = false;
+            }
+            if (!inString && !inLineComment && c == '/' && next == '*') {
+                inBlockComment = true;
+            }
+            if (inBlockComment && c == '*' && next == '/') {
+                inBlockComment = false;
+                current.append(c).append(next);
+                i++;
+                continue;
+            }
+            
+            // Обработка строк
+            if (!inLineComment && !inBlockComment) {
+                if (!inString && (c == '\'' || c == '"')) {
+                    inString = true;
+                    stringChar = c;
+                } else if (inString && c == stringChar) {
+                    // Проверяем escape: ''
+                    if (next == stringChar) {
+                        current.append(c).append(next);
+                        i++;
+                        continue;
+                    }
+                    inString = false;
+                }
+            }
+            
+            // Разделитель statements
+            if (!inString && !inLineComment && !inBlockComment && c == ';') {
+                String stmt = current.toString().trim();
+                if (!stmt.isEmpty()) {
+                    statements.add(stmt);
+                }
+                current = new StringBuilder();
+                continue;
+            }
+            
+            current.append(c);
+        }
+        
+        // Последний statement без ;
+        String last = current.toString().trim();
+        if (!last.isEmpty()) {
+            statements.add(last);
+        }
+        
+        return statements;
+    }
+}
+```
+
 ---
 
 ## 3. Executor Module (`hex-db-executor`)
@@ -743,40 +981,60 @@ package com.framework.hex.db.executor;
 
 /**
  * Стандартная реализация QueryExecutor.
+ * 
+ * <p><b>Thread Safety:</b> Этот класс потокобезопасен.
+ * Каждый запрос использует свой connection из пула.
  */
 public class DefaultQueryExecutor implements QueryExecutor {
     
     private final DataSourceProvider dataSourceProvider;
     private final String dataSourceName;
     private final List<QueryInterceptor> interceptors;
+    private final Supplier<Connection> transactionConnectionSupplier;
     
     public DefaultQueryExecutor(DataSourceProvider provider) {
-        this(provider, "default", List.of());
+        this(provider, "default", List.of(), () -> null);
     }
     
     public DefaultQueryExecutor(DataSourceProvider provider, 
                                  String dataSourceName,
-                                 List<QueryInterceptor> interceptors) {
+                                 List<QueryInterceptor> interceptors,
+                                 Supplier<Connection> transactionConnectionSupplier) {
         this.dataSourceProvider = provider;
         this.dataSourceName = dataSourceName;
         this.interceptors = new ArrayList<>(interceptors);
+        this.transactionConnectionSupplier = transactionConnectionSupplier;
     }
     
     @Override
     public QueryResult execute(Query query) {
         // Применяем интерцепторы
         Query processedQuery = applyInterceptors(query);
+        Instant start = Instant.now();
         
         try {
-            Connection conn = getConnection();
-            try {
-                return doExecute(conn, processedQuery);
-            } finally {
-                releaseConnection(conn);
-            }
+            Connection conn = getConnectionInternal();
+            boolean ownsConnection = !isInTransaction();
+            
+            return doExecute(conn, processedQuery, ownsConnection);
         } catch (SQLException e) {
+            Duration duration = Duration.between(start, Instant.now());
+            notifyError(query, e, duration);
             throw translateException(e, query);
         }
+    }
+    
+    private boolean isInTransaction() {
+        return transactionConnectionSupplier.get() != null;
+    }
+    
+    private Connection getConnectionInternal() throws SQLException {
+        // Если в транзакции — используем транзакционный connection
+        Connection txConn = transactionConnectionSupplier.get();
+        if (txConn != null) {
+            return txConn;
+        }
+        return dataSourceProvider.getDataSource(dataSourceName).getConnection();
     }
     
     @Override
@@ -789,7 +1047,8 @@ public class DefaultQueryExecutor implements QueryExecutor {
         return execute(sql, Map.of());
     }
     
-    private QueryResult doExecute(Connection conn, Query query) throws SQLException {
+    private QueryResult doExecute(Connection conn, Query query, boolean ownsConnection) 
+            throws SQLException {
         String sql = query.sql();
         Map<String, Object> params = query.parameters();
         
@@ -806,13 +1065,19 @@ public class DefaultQueryExecutor implements QueryExecutor {
         // Выполняем
         if (query.type() == QueryType.SELECT) {
             ResultSet rs = stmt.executeQuery();
-            return new ResultSetQueryResult(rs, stmt);
+            // Connection передаётся в результат — будет закрыт в close()
+            // ownsConnection = false если мы в транзакции (connection не закрываем)
+            return new ResultSetQueryResult(rs, stmt, ownsConnection ? conn : null);
         } else {
             int affected = stmt.executeUpdate();
             List<Object> keys = query.returnGeneratedKeys() 
                 ? extractGeneratedKeys(stmt) 
                 : List.of();
             stmt.close();
+            // Закрываем connection только если он наш (не транзакционный)
+            if (ownsConnection) {
+                conn.close();
+            }
             return new ModificationQueryResult(affected, keys);
         }
     }
@@ -905,17 +1170,26 @@ package com.framework.hex.db.executor;
 
 /**
  * Результат SELECT запроса.
+ * 
+ * <p><b>Resource Management:</b> Этот класс держит открытые ресурсы БД
+ * (ResultSet, Statement, Connection). Все терминальные операции (toList, 
+ * firstRow, scalar) автоматически закрывают ресурсы после чтения.
+ * 
+ * <p>При использовании stream() ресурсы НЕ закрываются автоматически —
+ * используйте try-with-resources!
  */
 public class ResultSetQueryResult implements QueryResult {
     
     private final ResultSet resultSet;
     private final Statement statement;
+    private final Connection connection;  // null если connection управляется транзакцией
     private ResultSetMetaData metadata;
     private List<String> columnNames;
     
-    ResultSetQueryResult(ResultSet rs, Statement stmt) {
+    ResultSetQueryResult(ResultSet rs, Statement stmt, Connection conn) {
         this.resultSet = rs;
         this.statement = stmt;
+        this.connection = conn;
     }
     
     @Override
@@ -982,6 +1256,24 @@ public class ResultSetQueryResult implements QueryResult {
         }
     }
     
+    /**
+     * Stream rows for large result sets.
+     * 
+     * <p><b>⚠️ IMPORTANT:</b> The returned Stream MUST be closed to release 
+     * database resources. Use try-with-resources:
+     * 
+     * <pre>{@code
+     * try (Stream<Row> rows = result.stream()) {
+     *     rows.filter(...).forEach(...);
+     * }
+     * }</pre>
+     * 
+     * <p>Or use terminal operations that auto-close (recommended):
+     * <pre>{@code
+     * result.toList(mapper);     // ✅ auto-closes
+     * result.firstRow(mapper);   // ✅ auto-closes
+     * }</pre>
+     */
     @Override
     public Stream<Row> stream() {
         ensureMetadata();
@@ -1032,9 +1324,21 @@ public class ResultSetQueryResult implements QueryResult {
     public void close() {
         try {
             resultSet.close();
+        } catch (SQLException e) {
+            // Log but don't throw
+        }
+        try {
             statement.close();
         } catch (SQLException e) {
             // Log but don't throw
+        }
+        // Закрываем connection только если он наш (не транзакционный)
+        if (connection != null) {
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                // Log but don't throw
+            }
         }
     }
     
@@ -1211,7 +1515,12 @@ import com.framework.hex.db.executor.*;
 /**
  * Главная точка входа в DB модуль.
  * 
- * Пример использования:
+ * <p><b>Thread Safety:</b> Этот класс полностью потокобезопасен. 
+ * Все операции с instance используют AtomicReference для lock-free доступа.
+ * Однако builders, возвращаемые методами select/insert/update/delete, 
+ * НЕ являются потокобезопасными — каждый поток должен создавать свой builder.
+ * 
+ * <p>Пример использования:
  * <pre>{@code
  * // Простой запрос
  * List<Map<String, Object>> users = Db.selectAll()
@@ -1230,12 +1539,21 @@ import com.framework.hex.db.executor.*;
  *     .value("email", "john@example.com")
  *     .returningKeys()
  *     .executeAndGetKey(Long.class);
+ * 
+ * // Транзакция
+ * Db.transaction(() -> {
+ *     Db.insertInto("orders").value("user_id", userId).execute();
+ *     Db.update("users").set("order_count", orderCount + 1).where("id", userId).execute();
+ * });
  * }</pre>
  */
 public final class Db {
     
-    private static volatile DbInstance defaultInstance;
-    private static final Object LOCK = new Object();
+    // Thread-safe instance management с AtomicReference
+    private static final AtomicReference<DbInstance> INSTANCE = new AtomicReference<>();
+    
+    // Реестр именованных DataSource для multi-datasource сценариев
+    private static final ConcurrentHashMap<String, DbInstance> NAMED_INSTANCES = new ConcurrentHashMap<>();
     
     private Db() {}
     
@@ -1250,21 +1568,55 @@ public final class Db {
     
     /**
      * Инициализация с полной конфигурацией.
+     * 
+     * <p><b>Thread Safety:</b> Этот метод потокобезопасен. При повторном вызове
+     * старый instance НЕ закрывается автоматически — используйте shutdown() 
+     * перед переконфигурацией, если нужно освободить ресурсы.
      */
     public static void configure(DbConfig config) {
-        synchronized (LOCK) {
-            if (defaultInstance != null) {
-                defaultInstance.close();
-            }
-            defaultInstance = new DbInstance(config);
-        }
+        DbInstance newInstance = new DbInstance(config);
+        INSTANCE.set(newInstance);
     }
     
     /**
      * Создать отдельный экземпляр (для multi-datasource).
+     * @deprecated Используйте {@link #register(String, DbConfig)} и {@link #use(String)}
      */
+    @Deprecated
     public static DbInstance create(DbConfig config) {
         return new DbInstance(config);
+    }
+    
+    // === Named DataSources Registry ===
+    
+    /**
+     * Зарегистрировать именованный DataSource.
+     * Удобно для работы с несколькими базами данных.
+     * 
+     * <pre>{@code
+     * Db.register("primary", primaryConfig);
+     * Db.register("analytics", analyticsConfig);
+     * 
+     * Db.use("primary").insertInto("users")...;
+     * Db.use("analytics").selectAll().from("reports")...;
+     * }</pre>
+     */
+    public static void register(String name, DbConfig config) {
+        NAMED_INSTANCES.put(name, new DbInstance(config));
+    }
+    
+    /**
+     * Получить именованный instance.
+     * 
+     * @throws IllegalStateException если DataSource с таким именем не зарегистрирован
+     */
+    public static DbInstance use(String name) {
+        DbInstance instance = NAMED_INSTANCES.get(name);
+        if (instance == null) {
+            throw new IllegalStateException("DataSource '" + name + "' not registered. " +
+                "Call Db.register(\"" + name + "\", config) first.");
+        }
+        return instance;
     }
     
     // === Query Builders (статические методы делегируют в instance) ===
@@ -1281,6 +1633,10 @@ public final class Db {
         return instance().insertInto(table);
     }
     
+    public static BatchInsertBuilder batchInsertInto(String table) {
+        return instance().batchInsertInto(table);
+    }
+    
     public static UpdateBuilder update(String table) {
         return instance().update(table);
     }
@@ -1291,6 +1647,96 @@ public final class Db {
     
     public static RawQueryBuilder raw(String sql) {
         return instance().raw(sql);
+    }
+    
+    // === SQL from File ===
+    
+    /**
+     * Выполнить SQL скрипт из файла.
+     * Поддерживает несколько statements, разделённых ;
+     * 
+     * <pre>{@code
+     * Db.executeScript(Path.of("src/test/resources/schema.sql"));
+     * }</pre>
+     */
+    public static void executeScript(Path path) {
+        instance().executeScript(path);
+    }
+    
+    /**
+     * Выполнить SQL скрипт из classpath ресурса.
+     * 
+     * <pre>{@code
+     * Db.executeScript("db/schema.sql");
+     * Db.executeScript("db/test-data.sql");
+     * }</pre>
+     */
+    public static void executeScript(String classpathResource) {
+        instance().executeScript(classpathResource);
+    }
+    
+    /**
+     * Загрузить SQL из файла для использования в запросе с параметрами.
+     * 
+     * <pre>{@code
+     * List<Map<String, Object>> results = Db.fromFile(Path.of("queries/report.sql"))
+     *     .param("startDate", startDate)
+     *     .param("endDate", endDate)
+     *     .toList();
+     * }</pre>
+     */
+    public static RawQueryBuilder fromFile(Path path) {
+        return instance().fromFile(path);
+    }
+    
+    /**
+     * Загрузить SQL из classpath ресурса для использования в запросе.
+     * 
+     * <pre>{@code
+     * List<Map<String, Object>> results = Db.fromResource("queries/user-stats.sql")
+     *     .param("minOrders", 10)
+     *     .toList();
+     * }</pre>
+     */
+    public static RawQueryBuilder fromResource(String classpathResource) {
+        return instance().fromResource(classpathResource);
+    }
+    
+    // === Transactions ===
+    
+    /**
+     * Выполнить код в транзакции с возвратом значения.
+     * Автоматический COMMIT при успехе, ROLLBACK при исключении.
+     * 
+     * <pre>{@code
+     * Long orderId = Db.transaction(() -> {
+     *     Long id = Db.insertInto("orders")
+     *         .value("user_id", userId)
+     *         .executeAndGetKey(Long.class);
+     *     Db.update("users")
+     *         .increment("order_count", 1)
+     *         .where("id", userId)
+     *         .execute();
+     *     return id;
+     * });
+     * }</pre>
+     */
+    public static <T> T transaction(Supplier<T> action) {
+        return instance().transaction(action);
+    }
+    
+    /**
+     * Выполнить код в транзакции без возврата значения.
+     * 
+     * <pre>{@code
+     * Db.transaction(() -> {
+     *     Db.insertInto("audit_log").value("action", "delete").execute();
+     *     Db.deleteFrom("users").where("id", userId).execute();
+     * });
+     * }</pre>
+     */
+    public static void transaction(Runnable action) {
+        transaction(() -> { action.run(); return null; });
     }
     
     // === Escape Hatch ===
@@ -1305,17 +1751,27 @@ public final class Db {
     
     // === Lifecycle ===
     
+    /**
+     * Закрыть default instance и освободить ресурсы.
+     */
     public static void shutdown() {
-        synchronized (LOCK) {
-            if (defaultInstance != null) {
-                defaultInstance.close();
-                defaultInstance = null;
-            }
+        DbInstance old = INSTANCE.getAndSet(null);
+        if (old != null) {
+            old.close();
         }
     }
     
+    /**
+     * Закрыть все instances (default + named) и освободить ресурсы.
+     */
+    public static void shutdownAll() {
+        shutdown();
+        NAMED_INSTANCES.values().forEach(DbInstance::close);
+        NAMED_INSTANCES.clear();
+    }
+    
     private static DbInstance instance() {
-        DbInstance inst = defaultInstance;
+        DbInstance inst = INSTANCE.get();
         if (inst == null) {
             throw new IllegalStateException(
                 "Db not configured. Call Db.configure(dataSource) first.");
@@ -1331,6 +1787,9 @@ package com.framework.hex.db;
 /**
  * Экземпляр DB для работы с конкретным DataSource.
  * Используется для multi-datasource сценариев.
+ * 
+ * <p><b>Thread Safety:</b> Этот класс потокобезопасен.
+ * Транзакции изолированы по потокам через ThreadLocal.
  */
 public class DbInstance implements AutoCloseable {
     
@@ -1338,13 +1797,17 @@ public class DbInstance implements AutoCloseable {
     private final DataSourceProvider dataSourceProvider;
     private final QueryExecutor executor;
     
+    // ThreadLocal для connection в транзакции
+    private final ThreadLocal<Connection> transactionConnection = new ThreadLocal<>();
+    
     DbInstance(DbConfig config) {
         this.config = config;
         this.dataSourceProvider = createDataSourceProvider(config);
         this.executor = new DefaultQueryExecutor(
             dataSourceProvider, 
             "default",
-            config.getInterceptors()
+            config.getInterceptors(),
+            this::getTransactionConnection  // Передаём supplier для транзакционного connection
         );
     }
     
@@ -1362,6 +1825,10 @@ public class DbInstance implements AutoCloseable {
         return new ExecutableInsertBuilder(table, executor);
     }
     
+    public BatchInsertBuilder batchInsertInto(String table) {
+        return new ExecutableBatchInsertBuilder(table, executor);
+    }
+    
     public UpdateBuilder update(String table) {
         return new ExecutableUpdateBuilder(table, executor);
     }
@@ -1374,9 +1841,140 @@ public class DbInstance implements AutoCloseable {
         return new ExecutableRawBuilder(sql, executor);
     }
     
+    // === SQL from File ===
+    
+    /**
+     * Выполнить SQL скрипт из файла.
+     */
+    public void executeScript(Path path) {
+        try {
+            String content = Files.readString(path, StandardCharsets.UTF_8);
+            executeScriptContent(content);
+        } catch (IOException e) {
+            throw new DbException("Failed to read SQL file: " + path, e);
+        }
+    }
+    
+    /**
+     * Выполнить SQL скрипт из classpath ресурса.
+     */
+    public void executeScript(String classpathResource) {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(classpathResource)) {
+            if (is == null) {
+                throw new DbException("Resource not found: " + classpathResource);
+            }
+            String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            executeScriptContent(content);
+        } catch (IOException e) {
+            throw new DbException("Failed to read SQL resource: " + classpathResource, e);
+        }
+    }
+    
+    /**
+     * Загрузить SQL из файла для использования с параметрами.
+     */
+    public RawQueryBuilder fromFile(Path path) {
+        try {
+            String sql = Files.readString(path, StandardCharsets.UTF_8);
+            return raw(sql);
+        } catch (IOException e) {
+            throw new DbException("Failed to read SQL file: " + path, e);
+        }
+    }
+    
+    /**
+     * Загрузить SQL из classpath ресурса для использования с параметрами.
+     */
+    public RawQueryBuilder fromResource(String classpathResource) {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(classpathResource)) {
+            if (is == null) {
+                throw new DbException("Resource not found: " + classpathResource);
+            }
+            String sql = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            return raw(sql);
+        } catch (IOException e) {
+            throw new DbException("Failed to read SQL resource: " + classpathResource, e);
+        }
+    }
+    
+    private void executeScriptContent(String content) {
+        // Разбиваем на statements по ; (учитывая строки и комментарии)
+        List<String> statements = SqlScriptParser.splitStatements(content);
+        
+        try (Connection conn = getConnection()) {
+            for (String sql : statements) {
+                String trimmed = sql.trim();
+                if (!trimmed.isEmpty()) {
+                    try (Statement stmt = conn.createStatement()) {
+                        stmt.execute(trimmed);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            throw new DbException("Failed to execute SQL script", e);
+        }
+    }
+    
+    // === Transactions ===
+    
+    /**
+     * Выполнить код в транзакции.
+     * Автоматический COMMIT при успехе, ROLLBACK при исключении.
+     * 
+     * <p><b>Thread Safety:</b> Каждый поток имеет свою изолированную транзакцию.
+     * Вложенные вызовы transaction() используют ту же транзакцию (не создают savepoint).
+     */
+    public <T> T transaction(Supplier<T> action) {
+        // Проверяем, не находимся ли уже в транзакции
+        if (transactionConnection.get() != null) {
+            // Вложенная транзакция — просто выполняем код
+            return action.get();
+        }
+        
+        Connection conn = null;
+        try {
+            conn = dataSourceProvider.getDataSource("default").getConnection();
+            conn.setAutoCommit(false);
+            transactionConnection.set(conn);
+            
+            T result = action.get();
+            
+            conn.commit();
+            return result;
+        } catch (Exception e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ignored) {}
+            }
+            if (e instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new DbException("Transaction failed", e);
+        } finally {
+            transactionConnection.remove();
+            if (conn != null) {
+                try { 
+                    conn.setAutoCommit(true);
+                    conn.close(); 
+                } catch (SQLException ignored) {}
+            }
+        }
+    }
+    
+    /**
+     * Получить connection текущей транзакции или null.
+     */
+    Connection getTransactionConnection() {
+        return transactionConnection.get();
+    }
+    
     // === Direct access ===
     
     public Connection getConnection() {
+        // Если в транзакции — возвращаем транзакционный connection
+        Connection txConn = transactionConnection.get();
+        if (txConn != null) {
+            return txConn;
+        }
         return executor.getConnection();
     }
     
@@ -1390,7 +1988,6 @@ public class DbInstance implements AutoCloseable {
     }
     
     private DataSourceProvider createDataSourceProvider(DbConfig config) {
-        // Default implementation or from config
         SimpleDataSourceProvider provider = new SimpleDataSourceProvider();
         provider.register("default", config.getDataSource());
         return provider;
@@ -1596,6 +2193,58 @@ public class ExecutableDeleteBuilder extends DeleteBuilder {
 }
 ```
 
+```java
+package com.framework.hex.db.builders;
+
+/**
+ * BatchInsertBuilder с методами выполнения.
+ */
+public class ExecutableBatchInsertBuilder extends BatchInsertBuilder {
+    
+    private final QueryExecutor executor;
+    
+    public ExecutableBatchInsertBuilder(String table, QueryExecutor executor) {
+        super(table);
+        this.executor = executor;
+    }
+    
+    /**
+     * Выполнить batch INSERT.
+     * @return массив количества затронутых строк для каждой вставки
+     */
+    public int[] execute() {
+        if (size() == 0) {
+            return new int[0];
+        }
+        return executor.executeBatch(buildSql(), getRowsParams());
+    }
+    
+    @Override
+    public ExecutableBatchInsertBuilder columns(String... cols) {
+        super.columns(cols);
+        return this;
+    }
+    
+    @Override
+    public ExecutableBatchInsertBuilder row(Object... values) {
+        super.row(values);
+        return this;
+    }
+    
+    @Override
+    public ExecutableBatchInsertBuilder row(Map<String, Object> row) {
+        super.row(row);
+        return this;
+    }
+    
+    @Override
+    public ExecutableBatchInsertBuilder rows(List<Map<String, Object>> rows) {
+        super.rows(rows);
+        return this;
+    }
+}
+```
+
 ---
 
 ## 6. Конфигурация
@@ -1701,13 +2350,20 @@ public interface QueryInterceptor {
 ```java
 package com.framework.hex.db.interceptors;
 
+/**
+ * Интерцептор для логирования SQL запросов.
+ * Выводит SQL с интерполированными параметрами для удобства отладки.
+ */
 public class LoggingInterceptor implements QueryInterceptor {
     
     private static final Logger log = LoggerFactory.getLogger(LoggingInterceptor.class);
     
     @Override
     public Query beforeExecute(Query query) {
-        log.debug("→ SQL: {} | Params: {}", query.sql(), query.parameters());
+        if (log.isDebugEnabled()) {
+            String interpolated = interpolateSql(query.sql(), query.parameters());
+            log.debug("→ SQL: {}", interpolated);
+        }
         return query;
     }
     
@@ -1718,7 +2374,41 @@ public class LoggingInterceptor implements QueryInterceptor {
     
     @Override
     public void onError(Query query, Exception error, Duration duration) {
-        log.error("✗ {} ms | Error: {}", duration.toMillis(), error.getMessage());
+        log.error("✗ {} ms | Error: {} | SQL: {}", 
+            duration.toMillis(), 
+            error.getMessage(),
+            interpolateSql(query.sql(), query.parameters()));
+    }
+    
+    /**
+     * Интерполировать параметры в SQL для отладки.
+     * НЕ использовать для выполнения — только для логирования!
+     */
+    private String interpolateSql(String sql, Map<String, Object> params) {
+        String result = sql;
+        for (Map.Entry<String, Object> e : params.entrySet()) {
+            String value = formatValue(e.getValue());
+            result = result.replace(":" + e.getKey(), value);
+        }
+        return result;
+    }
+    
+    private String formatValue(Object value) {
+        if (value == null) return "NULL";
+        if (value instanceof String s) return "'" + escapeSql(s) + "'";
+        if (value instanceof LocalDateTime || value instanceof LocalDate) {
+            return "'" + value + "'";
+        }
+        if (value instanceof Collection<?> coll) {
+            return coll.stream()
+                .map(this::formatValue)
+                .collect(Collectors.joining(", "));
+        }
+        return String.valueOf(value);
+    }
+    
+    private String escapeSql(String s) {
+        return s.replace("'", "''");
     }
 }
 ```
@@ -2059,41 +2749,208 @@ class ComplexQueryTest {
 ```java
 class MultiDataSourceTest {
     
-    private static DbInstance primaryDb;
-    private static DbInstance analyticsDb;
-    
     @BeforeAll
     static void setup() {
-        primaryDb = Db.create(DbConfig.builder()
+        // Регистрируем именованные DataSource
+        Db.register("primary", DbConfig.builder()
             .jdbc("jdbc:postgresql://primary:5432/app", "user", "pass")
             .build());
         
-        analyticsDb = Db.create(DbConfig.builder()
+        Db.register("analytics", DbConfig.builder()
             .jdbc("jdbc:postgresql://analytics:5432/app", "reader", "pass")
             .build());
     }
     
     @AfterAll
     static void cleanup() {
-        primaryDb.close();
-        analyticsDb.close();
+        Db.shutdownAll();
     }
     
     @Test
     void shouldQueryDifferentDatabases() {
         // Запись в primary
-        Long id = primaryDb.insertInto("users")
+        Long id = Db.use("primary").insertInto("users")
             .value("name", "Test")
             .executeAndGetKey(Long.class);
         
         // Чтение из analytics (replica)
-        Optional<Map<String, Object>> user = analyticsDb.selectAll()
+        Optional<Map<String, Object>> user = Db.use("analytics").selectAll()
             .from("users")
             .where("id", id)
             .first();
         
-        // Может быть задержка репликации
         assertThat(user).isPresent();
+    }
+}
+```
+
+### Транзакции
+
+```java
+class TransactionTest {
+    
+    @Test
+    void shouldCommitOnSuccess() {
+        Long orderId = Db.transaction(() -> {
+            // Создаём заказ
+            Long id = Db.insertInto("orders")
+                .value("user_id", userId)
+                .value("total", BigDecimal.valueOf(100))
+                .executeAndGetKey(Long.class);
+            
+            // Обновляем счётчик заказов пользователя
+            Db.update("users")
+                .increment("order_count", 1)
+                .where("id", userId)
+                .execute();
+            
+            return id;
+        });
+        
+        assertThat(orderId).isPositive();
+    }
+    
+    @Test
+    void shouldRollbackOnFailure() {
+        Long userId = createTestUser();
+        
+        assertThrows(RuntimeException.class, () -> {
+            Db.transaction(() -> {
+                Db.insertInto("orders")
+                    .value("user_id", userId)
+                    .value("total", BigDecimal.valueOf(100))
+                    .execute();
+                
+                // Симулируем ошибку
+                throw new RuntimeException("Simulated failure");
+            });
+        });
+        
+        // Заказ не создан — транзакция откатилась
+        long orderCount = Db.select("COUNT(*)")
+            .from("orders")
+            .where("user_id", userId)
+            .scalar(Long.class);
+        
+        assertThat(orderCount).isZero();
+    }
+    
+    @Test
+    void shouldIsolateParallelTransactions() throws Exception {
+        // Транзакции в разных потоках изолированы
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        
+        Future<Long> future1 = executor.submit(() -> 
+            Db.transaction(() -> {
+                Thread.sleep(100);  // Имитация работы
+                return Db.insertInto("users")
+                    .value("name", "Thread1")
+                    .executeAndGetKey(Long.class);
+            })
+        );
+        
+        Future<Long> future2 = executor.submit(() -> 
+            Db.transaction(() -> {
+                return Db.insertInto("users")
+                    .value("name", "Thread2")
+                    .executeAndGetKey(Long.class);
+            })
+        );
+        
+        Long id1 = future1.get();
+        Long id2 = future2.get();
+        
+        assertThat(id1).isNotEqualTo(id2);
+        executor.shutdown();
+    }
+}
+```
+
+### SQL из файлов
+
+```java
+class SqlFromFileTest {
+    
+    @BeforeAll
+    static void setupSchema() {
+        // Загружаем схему БД из файлов
+        Db.executeScript("db/schema.sql");
+        Db.executeScript("db/test-data.sql");
+    }
+    
+    @AfterAll
+    static void cleanup() {
+        Db.executeScript("db/cleanup.sql");
+    }
+    
+    @Test
+    void shouldExecuteComplexQueryFromFile() {
+        // Сложный запрос хранится в отдельном .sql файле
+        List<Map<String, Object>> results = Db.fromResource("queries/user-stats.sql")
+            .param("minOrders", 5)
+            .param("since", LocalDate.now().minusMonths(3))
+            .toList();
+        
+        assertThat(results).isNotEmpty();
+    }
+    
+    @Test
+    void shouldLoadFromAbsolutePath() {
+        Path sqlFile = Paths.get("src/test/resources/queries/monthly-report.sql");
+        
+        List<Map<String, Object>> report = Db.fromFile(sqlFile)
+            .param("year", 2024)
+            .param("month", 12)
+            .toList();
+        
+        assertThat(report).isNotEmpty();
+    }
+}
+```
+
+**Структура тестовых ресурсов:**
+```
+src/test/resources/
+├── db/
+│   ├── schema.sql          # CREATE TABLE statements
+│   ├── test-data.sql       # INSERT test fixtures
+│   └── cleanup.sql         # TRUNCATE/DELETE
+└── queries/
+    ├── user-stats.sql      # Сложные SELECT с :параметрами
+    └── monthly-report.sql
+```
+
+### Batch Insert
+
+```java
+class BatchInsertTest {
+    
+    @Test
+    void shouldInsertMultipleRows() {
+        int[] results = Db.batchInsertInto("users")
+            .columns("name", "email", "active")
+            .row("John", "john@test.com", true)
+            .row("Jane", "jane@test.com", true)
+            .row("Bob", "bob@test.com", false)
+            .execute();
+        
+        assertThat(results).hasSize(3);
+        assertThat(Arrays.stream(results).sum()).isEqualTo(3);
+    }
+    
+    @Test
+    void shouldInsertFromList() {
+        List<Map<String, Object>> users = List.of(
+            Map.of("name", "User1", "email", "u1@test.com", "active", true),
+            Map.of("name", "User2", "email", "u2@test.com", "active", true),
+            Map.of("name", "User3", "email", "u3@test.com", "active", false)
+        );
+        
+        int[] results = Db.batchInsertInto("users")
+            .rows(users)
+            .execute();
+        
+        assertThat(results).hasSize(3);
     }
 }
 ```
