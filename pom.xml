@@ -47,7 +47,6 @@
         <module>hex-core</module>
         <module>hex-core-api</module>
         <module>hex-core-ui</module>
-        <module>hex-core-testing</module>
         <module>hex-project-samples</module>
     </modules>
 
@@ -266,7 +265,6 @@
                     <version>${checkstyle.plugin.version}</version>
                     <configuration>
                         <configLocation>google_checks.xml</configLocation>
-                        <encoding>UTF-8</encoding>
                         <consoleOutput>true</consoleOutput>
                         <failsOnError>true</failsOnError>
                         <linkXRef>false</linkXRef>
