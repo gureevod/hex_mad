@@ -1002,7 +1002,7 @@ public class DefaultQueryExecutor implements QueryExecutor {
                                  Supplier<Connection> transactionConnectionSupplier) {
         this.dataSourceProvider = provider;
         this.dataSourceName = dataSourceName;
-        this.interceptors = new ArrayList<>(interceptors);
+        this.interceptors = List.copyOf(interceptors);  // Immutable для thread-safety
         this.transactionConnectionSupplier = transactionConnectionSupplier;
     }
     
@@ -1180,16 +1180,65 @@ package com.framework.hex.db.executor;
  */
 public class ResultSetQueryResult implements QueryResult {
     
+    private static final Logger log = LoggerFactory.getLogger(ResultSetQueryResult.class);
+    
     private final ResultSet resultSet;
     private final Statement statement;
     private final Connection connection;  // null если connection управляется транзакцией
+    private final long createdAt = System.nanoTime();
     private ResultSetMetaData metadata;
     private List<String> columnNames;
+    private volatile boolean closed = false;
+    
+    // Cleaner для safety-net от утечки ресурсов
+    private static final Cleaner CLEANER = Cleaner.create();
+    private final Cleaner.Cleanable cleanable;
     
     ResultSetQueryResult(ResultSet rs, Statement stmt, Connection conn) {
         this.resultSet = rs;
         this.statement = stmt;
         this.connection = conn;
+        
+        // Safety-net: если пользователь забыл закрыть stream, 
+        // Cleaner закроет ресурсы и залогирует предупреждение
+        CleanupAction cleanup = new CleanupAction(rs, stmt, conn, createdAt);
+        this.cleanable = CLEANER.register(this, cleanup);
+    }
+    
+    /**
+     * Действие очистки для Cleaner.
+     * Должен быть static чтобы не держать ссылку на ResultSetQueryResult.
+     */
+    private static class CleanupAction implements Runnable {
+        private final ResultSet rs;
+        private final Statement stmt;
+        private final Connection conn;
+        private final long createdAt;
+        
+        CleanupAction(ResultSet rs, Statement stmt, Connection conn, long createdAt) {
+            this.rs = rs;
+            this.stmt = stmt;
+            this.conn = conn;
+            this.createdAt = createdAt;
+        }
+        
+        @Override
+        public void run() {
+            long aliveMs = (System.nanoTime() - createdAt) / 1_000_000;
+            log.warn("⚠️ RESOURCE LEAK DETECTED! ResultSetQueryResult was not closed. " +
+                     "Alive for {} ms. Auto-closing now. " +
+                     "Use try-with-resources with stream() or terminal operations like toList().",
+                     aliveMs);
+            closeQuietly(rs);
+            closeQuietly(stmt);
+            closeQuietly(conn);
+        }
+        
+        private void closeQuietly(AutoCloseable resource) {
+            if (resource != null) {
+                try { resource.close(); } catch (Exception ignored) {}
+            }
+        }
     }
     
     @Override
@@ -1322,6 +1371,14 @@ public class ResultSetQueryResult implements QueryResult {
     
     @Override
     public void close() {
+        if (closed) {
+            return;  // Идемпотентность
+        }
+        closed = true;
+        
+        // Отменяем Cleaner — мы сами закрыли ресурсы корректно
+        cleanable.clean();
+        
         try {
             resultSet.close();
         } catch (SQLException e) {
@@ -1969,11 +2026,23 @@ public class DbInstance implements AutoCloseable {
     
     // === Direct access ===
     
+    /**
+     * Получить соединение напрямую.
+     * 
+     * <p><b>⚠️ ВАЖНО:</b> Нельзя вызывать внутри транзакции! Используйте
+     * builder-методы (select, insert, update, delete) для работы в транзакции.
+     * 
+     * @throws IllegalStateException если вызван внутри транзакции
+     */
     public Connection getConnection() {
-        // Если в транзакции — возвращаем транзакционный connection
+        // Запрещаем получение raw connection внутри транзакции,
+        // т.к. пользователь может закрыть его и сломать транзакцию
         Connection txConn = transactionConnection.get();
         if (txConn != null) {
-            return txConn;
+            throw new IllegalStateException(
+                "Cannot get raw connection inside a transaction. " +
+                "Use builder methods (select, insert, update, delete) instead, " +
+                "or call getConnection() outside of transaction block.");
         }
         return executor.getConnection();
     }
