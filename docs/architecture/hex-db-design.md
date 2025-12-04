@@ -239,10 +239,10 @@ package com.framework.hex.db.builders;
 /**
  * Билдер SELECT запросов.
  * 
- * <p><b>Thread Safety:</b> Builders are NOT thread-safe and should not be
- * shared between threads. Each thread should create its own builder instance.
+ * <p><b>Потокобезопасность:</b> Билдеры НЕ являются потокобезопасными и не должны
+ * использоваться совместно между потоками. Каждый поток должен создавать свой экземпляр билдера.
  * 
- * <p><b>Usage Pattern:</b>
+ * <p><b>Паттерн использования:</b>
  * <pre>{@code
  * // ✅ Правильно — создаём builder в каждом потоке
  * List<User> users = Db.selectAll().from("users").toList(mapper);
@@ -513,7 +513,7 @@ package com.framework.hex.db.builders;
 /**
  * Билдер INSERT запросов.
  * 
- * <p><b>Thread Safety:</b> NOT thread-safe. Create a new instance per thread.
+ * <p><b>Потокобезопасность:</b> НЕ потокобезопасен. Создавайте новый экземпляр для каждого потока.
  */
 public class InsertBuilder implements QueryBuilder {
     
@@ -570,7 +570,7 @@ package com.framework.hex.db.builders;
 /**
  * Билдер UPDATE запросов.
  * 
- * <p><b>Thread Safety:</b> NOT thread-safe. Create a new instance per thread.
+ * <p><b>Потокобезопасность:</b> НЕ потокобезопасен. Создавайте новый экземпляр для каждого потока.
  */
 public class UpdateBuilder implements QueryBuilder {
     
@@ -627,7 +627,7 @@ public class UpdateBuilder implements QueryBuilder {
     public Query build() {
         if (whereClauses.isEmpty()) {
             throw new IllegalStateException(
-                "UPDATE without WHERE is dangerous. Use whereRaw(\"1=1\") if intentional.");
+                "UPDATE без WHERE опасен. Используйте whereRaw(\"1=1\") если это намеренно.");
         }
         
         StringBuilder sql = new StringBuilder();
@@ -667,7 +667,7 @@ package com.framework.hex.db.builders;
 /**
  * Билдер DELETE запросов.
  * 
- * <p><b>Thread Safety:</b> NOT thread-safe. Create a new instance per thread.
+ * <p><b>Потокобезопасность:</b> НЕ потокобезопасен. Создавайте новый экземпляр для каждого потока.
  */
 public class DeleteBuilder implements QueryBuilder {
     
@@ -706,7 +706,7 @@ public class DeleteBuilder implements QueryBuilder {
     public Query build() {
         if (whereClauses.isEmpty()) {
             throw new IllegalStateException(
-                "DELETE without WHERE is dangerous. Use all() if intentional.");
+                "DELETE без WHERE опасен. Используйте all() если это намеренно.");
         }
         
         StringBuilder sql = new StringBuilder();
@@ -726,7 +726,7 @@ package com.framework.hex.db.builders;
  * Билдер для batch INSERT запросов.
  * Позволяет эффективно вставлять множество строк одним запросом.
  * 
- * <p><b>Thread Safety:</b> NOT thread-safe. Create a new instance per thread.
+ * <p><b>Потокобезопасность:</b> НЕ потокобезопасен. Создавайте новый экземпляр для каждого потока.
  * 
  * <p>Пример использования:
  * <pre>{@code
@@ -764,11 +764,11 @@ public class BatchInsertBuilder {
      */
     public BatchInsertBuilder row(Object... values) {
         if (columns.isEmpty()) {
-            throw new IllegalStateException("Call columns() before adding rows");
+            throw new IllegalStateException("Вызовите columns() перед добавлением строк");
         }
         if (values.length != columns.size()) {
             throw new IllegalArgumentException(
-                "Values count (" + values.length + ") must match columns count (" + columns.size() + ")");
+                "Количество значений (" + values.length + ") должно совпадать с количеством колонок (" + columns.size() + ")");
         }
         Map<String, Object> row = new LinkedHashMap<>();
         for (int i = 0; i < columns.size(); i++) {
@@ -835,7 +835,7 @@ package com.framework.hex.db.builders;
 /**
  * Билдер для сырого SQL.
  * 
- * <p><b>Thread Safety:</b> NOT thread-safe. Create a new instance per thread.
+ * <p><b>Потокобезопасность:</b> НЕ потокобезопасен. Создавайте новый экземпляр для каждого потока.
  */
 public class RawQueryBuilder implements QueryBuilder {
     
@@ -1002,7 +1002,7 @@ public class DefaultQueryExecutor implements QueryExecutor {
                                  Supplier<Connection> transactionConnectionSupplier) {
         this.dataSourceProvider = provider;
         this.dataSourceName = dataSourceName;
-        this.interceptors = List.copyOf(interceptors);  // Immutable для thread-safety
+        this.interceptors = List.copyOf(interceptors);  // Неизменяемая копия для потокобезопасности
         this.transactionConnectionSupplier = transactionConnectionSupplier;
     }
     
@@ -1148,7 +1148,7 @@ public class DefaultQueryExecutor implements QueryExecutor {
         try {
             return dataSourceProvider.getDataSource(dataSourceName).getConnection();
         } catch (SQLException e) {
-            throw new DbException("Failed to get connection", e);
+            throw new DbException("Не удалось получить соединение", e);
         }
     }
     
@@ -1157,7 +1157,7 @@ public class DefaultQueryExecutor implements QueryExecutor {
         try {
             connection.close();
         } catch (SQLException e) {
-            // Log, but don't throw
+            // Логируем, но не бросаем исключение
         }
     }
     
@@ -1171,7 +1171,7 @@ package com.framework.hex.db.executor;
 /**
  * Результат SELECT запроса.
  * 
- * <p><b>Resource Management:</b> Этот класс держит открытые ресурсы БД
+ * <p><b>Управление ресурсами:</b> Этот класс держит открытые ресурсы БД
  * (ResultSet, Statement, Connection). Все терминальные операции (toList, 
  * firstRow, scalar) автоматически закрывают ресурсы после чтения.
  * 
@@ -1225,9 +1225,9 @@ public class ResultSetQueryResult implements QueryResult {
         @Override
         public void run() {
             long aliveMs = (System.nanoTime() - createdAt) / 1_000_000;
-            log.warn("⚠️ RESOURCE LEAK DETECTED! ResultSetQueryResult was not closed. " +
-                     "Alive for {} ms. Auto-closing now. " +
-                     "Use try-with-resources with stream() or terminal operations like toList().",
+            log.warn("⚠️ ОБНАРУЖЕНА УТЕЧКА РЕСУРСОВ! ResultSetQueryResult не был закрыт. " +
+                     "Жил {} мс. Автозакрытие сейчас. " +
+                     "Используйте try-with-resources с stream() или терминальные операции наподобие toList().",
                      aliveMs);
             closeQuietly(rs);
             closeQuietly(stmt);
@@ -1257,7 +1257,7 @@ public class ResultSetQueryResult implements QueryResult {
             }
             return results;
         } catch (SQLException e) {
-            throw new DbException("Failed to read results", e);
+            throw new DbException("Не удалось прочитать результаты", e);
         } finally {
             close();
         }
@@ -1278,7 +1278,7 @@ public class ResultSetQueryResult implements QueryResult {
             }
             return Optional.empty();
         } catch (SQLException e) {
-            throw new DbException("Failed to read first row", e);
+            throw new DbException("Не удалось прочитать первую строку", e);
         } finally {
             close();
         }
@@ -1287,7 +1287,7 @@ public class ResultSetQueryResult implements QueryResult {
     @Override
     public <T> T scalar(Class<T> type) {
         return scalarOptional(type)
-            .orElseThrow(() -> new DbException("Expected scalar result but got empty"));
+            .orElseThrow(() -> new DbException("Ожидался скалярный результат, но получено пусто"));
     }
     
     @Override
@@ -1299,17 +1299,17 @@ public class ResultSetQueryResult implements QueryResult {
             }
             return Optional.empty();
         } catch (SQLException e) {
-            throw new DbException("Failed to read scalar", e);
+            throw new DbException("Не удалось прочитать скалярное значение", e);
         } finally {
             close();
         }
     }
     
     /**
-     * Stream rows for large result sets.
+     * Стрим строк для больших результатов.
      * 
-     * <p><b>⚠️ IMPORTANT:</b> The returned Stream MUST be closed to release 
-     * database resources. Use try-with-resources:
+     * <p><b>⚠️ ВАЖНО:</b> Возвращаемый Stream ДОЛЖЕН быть закрыт для освобождения
+     * ресурсов БД. Используйте try-with-resources:
      * 
      * <pre>{@code
      * try (Stream<Row> rows = result.stream()) {
@@ -1317,10 +1317,10 @@ public class ResultSetQueryResult implements QueryResult {
      * }
      * }</pre>
      * 
-     * <p>Or use terminal operations that auto-close (recommended):
+     * <p>Или используйте терминальные операции с автозакрытием (рекомендуется):
      * <pre>{@code
-     * result.toList(mapper);     // ✅ auto-closes
-     * result.firstRow(mapper);   // ✅ auto-closes
+     * result.toList(mapper);     // ✅ автозакрытие
+     * result.firstRow(mapper);   // ✅ автозакрытие
      * }</pre>
      */
     @Override
@@ -1335,7 +1335,7 @@ public class ResultSetQueryResult implements QueryResult {
                     try {
                         hasNext = resultSet.next();
                     } catch (SQLException e) {
-                        throw new DbException("Failed to iterate", e);
+                        throw new DbException("Ошибка при итерации", e);
                     }
                 }
                 return hasNext;
@@ -1356,7 +1356,7 @@ public class ResultSetQueryResult implements QueryResult {
     
     @Override
     public int affectedRows() {
-        throw new UnsupportedOperationException("SELECT doesn't have affected rows");
+        throw new UnsupportedOperationException("SELECT не имеет затронутых строк");
     }
     
     @Override
@@ -1366,7 +1366,7 @@ public class ResultSetQueryResult implements QueryResult {
     
     @Override
     public <T> T generatedKey(Class<T> type) {
-        throw new UnsupportedOperationException("SELECT doesn't have generated keys");
+        throw new UnsupportedOperationException("SELECT не имеет сгенерированных ключей");
     }
     
     @Override
@@ -1382,19 +1382,19 @@ public class ResultSetQueryResult implements QueryResult {
         try {
             resultSet.close();
         } catch (SQLException e) {
-            // Log but don't throw
+            // Логируем, но не бросаем
         }
         try {
             statement.close();
         } catch (SQLException e) {
-            // Log but don't throw
+            // Логируем, но не бросаем
         }
         // Закрываем connection только если он наш (не транзакционный)
         if (connection != null) {
             try {
                 connection.close();
             } catch (SQLException e) {
-                // Log but don't throw
+                // Логируем, но не бросаем
             }
         }
     }
@@ -1408,7 +1408,7 @@ public class ResultSetQueryResult implements QueryResult {
                     columnNames.add(metadata.getColumnLabel(i).toLowerCase());
                 }
             } catch (SQLException e) {
-                throw new DbException("Failed to read metadata", e);
+                throw new DbException("Не удалось прочитать метаданные", e);
             }
         }
     }
@@ -1437,7 +1437,7 @@ public class ResultSetRow implements Row {
             Object value = rs.getObject(column);
             return convertValue(value, type);
         } catch (SQLException e) {
-            throw new DbException("Failed to read column: " + column, e);
+            throw new DbException("Не удалось прочитать колонку: " + column, e);
         }
     }
     
@@ -1447,7 +1447,7 @@ public class ResultSetRow implements Row {
             Object value = rs.getObject(index + 1);
             return convertValue(value, type);
         } catch (SQLException e) {
-            throw new DbException("Failed to read column at index: " + index, e);
+            throw new DbException("Не удалось прочитать колонку по индексу: " + index, e);
         }
     }
     
@@ -1482,7 +1482,7 @@ public class ResultSetRow implements Row {
             Timestamp ts = rs.getTimestamp(column);
             return ts != null ? ts.toLocalDateTime() : null;
         } catch (SQLException e) {
-            throw new DbException("Failed to read timestamp: " + column, e);
+            throw new DbException("Не удалось прочитать timestamp: " + column, e);
         }
     }
     
@@ -1492,7 +1492,7 @@ public class ResultSetRow implements Row {
             Date date = rs.getDate(column);
             return date != null ? date.toLocalDate() : null;
         } catch (SQLException e) {
-            throw new DbException("Failed to read date: " + column, e);
+            throw new DbException("Не удалось прочитать дату: " + column, e);
         }
     }
     
@@ -1501,7 +1501,7 @@ public class ResultSetRow implements Row {
         try {
             return rs.getBytes(column);
         } catch (SQLException e) {
-            throw new DbException("Failed to read bytes: " + column, e);
+            throw new DbException("Не удалось прочитать байты: " + column, e);
         }
     }
     
@@ -1538,7 +1538,7 @@ public class ResultSetRow implements Row {
         if (value == null) return null;
         if (type.isInstance(value)) return type.cast(value);
         
-        // Basic conversions
+        // Базовые преобразования
         if (type == Long.class && value instanceof Number n) {
             return (T) Long.valueOf(n.longValue());
         }
@@ -1670,8 +1670,8 @@ public final class Db {
     public static DbInstance use(String name) {
         DbInstance instance = NAMED_INSTANCES.get(name);
         if (instance == null) {
-            throw new IllegalStateException("DataSource '" + name + "' not registered. " +
-                "Call Db.register(\"" + name + "\", config) first.");
+            throw new IllegalStateException("DataSource '" + name + "' не зарегистрирован. " +
+                "Вызовите Db.register(\"" + name + "\", config) сначала.");
         }
         return instance;
     }
@@ -1831,7 +1831,7 @@ public final class Db {
         DbInstance inst = INSTANCE.get();
         if (inst == null) {
             throw new IllegalStateException(
-                "Db not configured. Call Db.configure(dataSource) first.");
+                "Db не сконфигурирован. Вызовите Db.configure(dataSource) сначала.");
         }
         return inst;
     }
@@ -1908,7 +1908,7 @@ public class DbInstance implements AutoCloseable {
             String content = Files.readString(path, StandardCharsets.UTF_8);
             executeScriptContent(content);
         } catch (IOException e) {
-            throw new DbException("Failed to read SQL file: " + path, e);
+            throw new DbException("Не удалось прочитать SQL файл: " + path, e);
         }
     }
     
@@ -1918,12 +1918,12 @@ public class DbInstance implements AutoCloseable {
     public void executeScript(String classpathResource) {
         try (InputStream is = getClass().getClassLoader().getResourceAsStream(classpathResource)) {
             if (is == null) {
-                throw new DbException("Resource not found: " + classpathResource);
+                throw new DbException("Ресурс не найден: " + classpathResource);
             }
             String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
             executeScriptContent(content);
         } catch (IOException e) {
-            throw new DbException("Failed to read SQL resource: " + classpathResource, e);
+            throw new DbException("Не удалось прочитать SQL ресурс: " + classpathResource, e);
         }
     }
     
@@ -1935,7 +1935,7 @@ public class DbInstance implements AutoCloseable {
             String sql = Files.readString(path, StandardCharsets.UTF_8);
             return raw(sql);
         } catch (IOException e) {
-            throw new DbException("Failed to read SQL file: " + path, e);
+            throw new DbException("Не удалось прочитать SQL файл: " + path, e);
         }
     }
     
@@ -1945,12 +1945,12 @@ public class DbInstance implements AutoCloseable {
     public RawQueryBuilder fromResource(String classpathResource) {
         try (InputStream is = getClass().getClassLoader().getResourceAsStream(classpathResource)) {
             if (is == null) {
-                throw new DbException("Resource not found: " + classpathResource);
+                throw new DbException("Ресурс не найден: " + classpathResource);
             }
             String sql = new String(is.readAllBytes(), StandardCharsets.UTF_8);
             return raw(sql);
         } catch (IOException e) {
-            throw new DbException("Failed to read SQL resource: " + classpathResource, e);
+            throw new DbException("Не удалось прочитать SQL ресурс: " + classpathResource, e);
         }
     }
     
@@ -1968,7 +1968,7 @@ public class DbInstance implements AutoCloseable {
                 }
             }
         } catch (SQLException e) {
-            throw new DbException("Failed to execute SQL script", e);
+            throw new DbException("Не удалось выполнить SQL скрипт", e);
         }
     }
     
@@ -1978,7 +1978,7 @@ public class DbInstance implements AutoCloseable {
      * Выполнить код в транзакции.
      * Автоматический COMMIT при успехе, ROLLBACK при исключении.
      * 
-     * <p><b>Thread Safety:</b> Каждый поток имеет свою изолированную транзакцию.
+     * <p><b>Потокобезопасность:</b> Каждый поток имеет свою изолированную транзакцию.
      * Вложенные вызовы transaction() используют ту же транзакцию (не создают savepoint).
      */
     public <T> T transaction(Supplier<T> action) {
@@ -2005,7 +2005,7 @@ public class DbInstance implements AutoCloseable {
             if (e instanceof RuntimeException re) {
                 throw re;
             }
-            throw new DbException("Transaction failed", e);
+            throw new DbException("Транзакция не удалась", e);
         } finally {
             transactionConnection.remove();
             if (conn != null) {
@@ -2040,9 +2040,9 @@ public class DbInstance implements AutoCloseable {
         Connection txConn = transactionConnection.get();
         if (txConn != null) {
             throw new IllegalStateException(
-                "Cannot get raw connection inside a transaction. " +
-                "Use builder methods (select, insert, update, delete) instead, " +
-                "or call getConnection() outside of transaction block.");
+                "Нельзя получить raw connection внутри транзакции. " +
+                "Используйте методы-билдеры (select, insert, update, delete), " +
+                "или вызовите getConnection() вне блока транзакции.");
         }
         return executor.getConnection();
     }
@@ -2337,7 +2337,7 @@ public class DbConfig {
         return new Builder();
     }
     
-    // Getters...
+    // Геттеры...
     
     public static class Builder {
         private final DbConfig config = new DbConfig();
@@ -2378,7 +2378,7 @@ public class DbConfig {
         }
         
         public DbConfig build() {
-            Objects.requireNonNull(config.dataSource, "DataSource is required");
+            Objects.requireNonNull(config.dataSource, "DataSource обязателен");
             return config;
         }
     }
@@ -2589,7 +2589,7 @@ class RecordMapper<T> implements RowMapper<T> {
                 .toArray(Class<?>[]::new);
             this.constructor = recordClass.getDeclaredConstructor(paramTypes);
         } catch (NoSuchMethodException e) {
-            throw new DbException("Cannot find record constructor", e);
+            throw new DbException("Не удалось найти конструктор record", e);
         }
     }
     
@@ -2604,7 +2604,7 @@ class RecordMapper<T> implements RowMapper<T> {
             }
             return constructor.newInstance(args);
         } catch (Exception e) {
-            throw new DbException("Failed to map row to " + recordClass.getSimpleName(), e);
+            throw new DbException("Не удалось преобразовать строку в " + recordClass.getSimpleName(), e);
         }
     }
     
@@ -2743,7 +2743,7 @@ class UserMappingTest {
     
     @Test
     void shouldMapWithCustomMapper() {
-        // Inline маппер
+        // Встроенный маппер
         List<String> emails = Db.select("email")
             .from("users")
             .where("active", true)
@@ -2803,7 +2803,7 @@ class ComplexQueryTest {
     
     @Test
     void shouldUseNativeConnection() {
-        // Escape hatch для совсем сложных случаев
+        // Аварийный выход для совсем сложных случаев
         try (Connection conn = Db.getConnection()) {
             // Делаем что угодно с connection
             DatabaseMetaData meta = conn.getMetaData();
@@ -2891,7 +2891,7 @@ class TransactionTest {
                     .execute();
                 
                 // Симулируем ошибку
-                throw new RuntimeException("Simulated failure");
+                throw new RuntimeException("Симуляция ошибки");
             });
         });
         
@@ -2981,8 +2981,8 @@ class SqlFromFileTest {
 ```
 src/test/resources/
 ├── db/
-│   ├── schema.sql          # CREATE TABLE statements
-│   ├── test-data.sql       # INSERT test fixtures
+│   ├── schema.sql          # Выражения CREATE TABLE
+│   ├── test-data.sql       # Тестовые данные для INSERT
 │   └── cleanup.sql         # TRUNCATE/DELETE
 └── queries/
     ├── user-stats.sql      # Сложные SELECT с :параметрами
