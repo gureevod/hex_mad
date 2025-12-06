@@ -11,4 +11,5 @@ hex-project-samples/allure-results/*
 hex-automation-framework/target/*
 hex-project-samples/.allure/
 hex-project-samples/build/*
+hex-core-db/target*
 hints-plugin/*
