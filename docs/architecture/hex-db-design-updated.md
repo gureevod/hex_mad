@@ -1,35 +1,88 @@
-# hex-db: Упрощённый дизайн
-
-> **Версия:** 2.0 (после ревью)  
-> **Дата:** 2024-12-06  
-> **Принцип:** Простота важнее гибкости
+# hex-core-db:
 
 ---
 
-## Архитектура модулей
+## Архитектура
+
+**Один модуль `hex-db`** — всё включено, HikariCP из коробки.
 
 ```
-hex-db-core          ← Базовые интерфейсы (Row, RowMapper, Query, QueryResult)
-    │
-    ├── hex-db-builders   ← Fluent билдеры (SQL.select, SQL.insert, ...)
-    │
-    └── hex-db-executor   ← Выполнение запросов (DefaultQueryExecutor)
+hex-core-db/
+├── src/main/java/com/company/hex/db/
+│   ├── core/           ← Row, RowMapper, Query, QueryResult, QueryExecutor
+│   ├── builders/       ← SQL, SelectBuilder, InsertBuilder, ...
+│   ├── executor/       ← DefaultQueryExecutor, SelectQueryResult, ...
+│   ├── Db.java         ← Главная точка входа
+│   ├── DbInstance.java
+│   ├── DbConfig.java
+│   └── DbException.java
+└── pom.xml
+```
 
-hex-db                    ← Главный модуль (Db, DbInstance, DbConfig)
+### Зависимости (pom.xml)
 
-[Опциональные расширения]
-    ├── hex-db-mapper     ← Авто-маппинг на record/class
-    └── hex-db-hikari     ← HikariCP интеграция
+```xml
+<dependencies>
+    <!-- Connection Pool — из коробки -->
+    <dependency>
+        <groupId>com.zaxxer</groupId>
+        <artifactId>HikariCP</artifactId>
+        <version>5.1.0</version>
+    </dependency>
+    
+    <!-- Логирование -->
+    <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>2.0.9</version>
+    </dependency>
+</dependencies>
+```
+
+### Использование в тестовом проекте
+
+```xml
+<!-- Подключаем hex-db -->
+<dependency>
+    <groupId>com.company.hex</groupId>
+    <artifactId>hex-core-db</artifactId>
+</dependency>
+
+<!-- + драйвер БД (пользователь добавляет свой) -->
+<dependency>
+    <groupId>org.postgresql</groupId>
+    <artifactId>postgresql</artifactId>
+    <version>42.7.1</version>
+</dependency>
+```
+
+```java
+// Всё работает из коробки:
+Db.configure(DbConfig.builder()
+    .jdbc("jdbc:postgresql://localhost:5432/test", "user", "pass")
+    .build());
+
+// Или с тонкой настройкой пула:
+Db.configure(DbConfig.builder()
+    .hikari(config -> {
+        config.setJdbcUrl("jdbc:postgresql://localhost:5432/test");
+        config.setUsername("user");
+        config.setPassword("pass");
+        config.setMaximumPoolSize(5);
+        config.setConnectionTimeout(5000);
+    })
+    .enableLogging()
+    .build());
 ```
 
 ---
 
-## 1. Core Module (`hex-db-core`)
+## 1. Core (пакет `core`)
 
 ### Row — строка результата
 
 ```java
-package com.framework.hex.db.core;
+package com.company.hex.db.core;
 
 /**
  * Представляет одну строку результата запроса.
@@ -72,7 +125,7 @@ public interface Row {
 ### RowMapper — маппинг строки в объект
 
 ```java
-package com.framework.hex.db.core;
+package com.company.hex.db.core;
 
 /**
  * Функция преобразования Row в объект.
@@ -93,7 +146,7 @@ public interface RowMapper<T> {
 ### QueryResult — результат выполнения
 
 ```java
-package com.framework.hex.db.core;
+package com.company.hex.db.core;
 
 /**
  * Результат выполнения запроса.
@@ -140,7 +193,7 @@ public interface QueryResult {
 ### Query — представление запроса
 
 ```java
-package com.framework.hex.db.core;
+package com.company.hex.db.core;
 
 /**
  * Описание запроса для выполнения.
@@ -168,7 +221,7 @@ public interface Query {
 ### QueryExecutor — исполнитель запросов
 
 ```java
-package com.framework.hex.db.core;
+package com.company.hex.db.core;
 
 /**
  * Выполняет запросы к БД.
@@ -192,12 +245,12 @@ public interface QueryExecutor {
 
 ---
 
-## 2. Builders Module (`hex-db-builders`)
+## 2. Builders (пакет `builders`)
 
 ### SQL — точка входа
 
 ```java
-package com.framework.hex.db.builders;
+package com.company.hex.db.builders;
 
 /**
  * Фабрика билдеров запросов.
@@ -242,7 +295,7 @@ public final class SQL {
 ### SelectBuilder
 
 ```java
-package com.framework.hex.db.builders;
+package com.company.hex.db.builders;
 
 /**
  * Билдер SELECT запросов.
@@ -416,7 +469,7 @@ public class SelectBuilder implements QueryBuilder {
 ### ExecutableSelectBuilder — билдер + выполнение
 
 ```java
-package com.framework.hex.db.builders;
+package com.company.hex.db.builders;
 
 /**
  * SelectBuilder с методами выполнения запроса.
@@ -483,7 +536,7 @@ public class ExecutableSelectBuilder extends SelectBuilder {
 ### InsertBuilder
 
 ```java
-package com.framework.hex.db.builders;
+package com.company.hex.db.builders;
 
 /**
  * Билдер INSERT запросов.
@@ -531,7 +584,7 @@ public class InsertBuilder implements QueryBuilder {
 ### ExecutableInsertBuilder
 
 ```java
-package com.framework.hex.db.builders;
+package com.company.hex.db.builders;
 
 /**
  * InsertBuilder с методами выполнения.
@@ -559,7 +612,7 @@ public class ExecutableInsertBuilder extends InsertBuilder {
 ### UpdateBuilder
 
 ```java
-package com.framework.hex.db.builders;
+package com.company.hex.db.builders;
 
 /**
  * Билдер UPDATE запросов.
@@ -629,7 +682,7 @@ public class UpdateBuilder implements QueryBuilder {
 ### ExecutableUpdateBuilder
 
 ```java
-package com.framework.hex.db.builders;
+package com.company.hex.db.builders;
 
 /**
  * UpdateBuilder с методами выполнения.
@@ -648,7 +701,7 @@ public class ExecutableUpdateBuilder extends UpdateBuilder {
 ### DeleteBuilder
 
 ```java
-package com.framework.hex.db.builders;
+package com.company.hex.db.builders;
 
 /**
  * Билдер DELETE запросов.
@@ -710,7 +763,7 @@ public class DeleteBuilder implements QueryBuilder {
 ### ExecutableDeleteBuilder
 
 ```java
-package com.framework.hex.db.builders;
+package com.company.hex.db.builders;
 
 /**
  * DeleteBuilder с методами выполнения.
@@ -729,7 +782,7 @@ public class ExecutableDeleteBuilder extends DeleteBuilder {
 ### BatchInsertBuilder
 
 ```java
-package com.framework.hex.db.builders;
+package com.company.hex.db.builders;
 
 /**
  * Билдер для batch INSERT — вставка множества строк одним запросом.
@@ -788,7 +841,7 @@ public class BatchInsertBuilder {
 ### RawQueryBuilder
 
 ```java
-package com.framework.hex.db.builders;
+package com.company.hex.db.builders;
 
 /**
  * Билдер для сырого SQL.
@@ -845,12 +898,12 @@ public class RawQueryBuilder implements QueryBuilder {
 
 ---
 
-## 3. Executor Module (`hex-db-executor`)
+## 3. Executor (пакет `executor`)
 
 ### DefaultQueryExecutor
 
 ```java
-package com.framework.hex.db.executor;
+package com.company.hex.db.executor;
 
 /**
  * Стандартная реализация QueryExecutor.
@@ -885,7 +938,7 @@ public class DefaultQueryExecutor implements QueryExecutor {
 ### SelectQueryResult — результат SELECT
 
 ```java
-package com.framework.hex.db.executor;
+package com.company.hex.db.executor;
 
 /**
  * Результат SELECT запроса.
@@ -952,7 +1005,7 @@ public class SelectQueryResult implements QueryResult {
 ### ModificationQueryResult — результат INSERT/UPDATE/DELETE
 
 ```java
-package com.framework.hex.db.executor;
+package com.company.hex.db.executor;
 
 /**
  * Результат модифицирующего запроса (INSERT/UPDATE/DELETE).
@@ -982,7 +1035,7 @@ public class ModificationQueryResult implements QueryResult {
 ### MapRow — Row на основе Map
 
 ```java
-package com.framework.hex.db.executor;
+package com.company.hex.db.executor;
 
 /**
  * Реализация Row на основе Map.
@@ -1015,12 +1068,12 @@ class MapRow implements Row {
 
 ---
 
-## 4. Главный модуль (`hex-db`)
+## 4. API (корень пакета)
 
 ### Db — статическая точка входа
 
 ```java
-package com.framework.hex.db;
+package com.company.hex.db;
 
 /**
  * Главная точка входа в hex-db.
@@ -1172,7 +1225,7 @@ public final class Db {
 ### DbInstance — экземпляр для конкретного DataSource
 
 ```java
-package com.framework.hex.db;
+package com.company.hex.db;
 
 /**
  * Экземпляр DB для конкретного DataSource.
@@ -1284,7 +1337,7 @@ public class DbInstance implements AutoCloseable {
 ### DbConfig — конфигурация
 
 ```java
-package com.framework.hex.db;
+package com.company.hex.db;
 
 /**
  * Конфигурация hex-db.
@@ -1343,10 +1396,10 @@ public class DbConfig {
 
 ---
 
-## 5. Интерцептор (опционально)
+## 5. Интерцептор (встроенный)
 
 ```java
-package com.framework.hex.db.core;
+package com.company.hex.db.core;
 
 /**
  * Интерцептор для логирования SQL.
@@ -1367,7 +1420,7 @@ public interface QueryInterceptor {
 ```
 
 ```java
-package com.framework.hex.db.interceptors;
+package com.company.hex.db.interceptors;
 
 /**
  * Логирует SQL с интерполированными параметрами.
@@ -1691,44 +1744,47 @@ class MultiDataSourceTest {
 ## Структура файлов
 
 ```
-hex-db/
-├── hex-db-core/
-│   └── src/main/java/com/framework/hex/db/core/
-│       ├── Row.java
-│       ├── RowMapper.java
-│       ├── Query.java
-│       ├── QueryResult.java
-│       ├── QueryExecutor.java
-│       ├── QueryInterceptor.java
-│       └── DbException.java
-│
-├── hex-db-builders/
-│   └── src/main/java/com/framework/hex/db/builders/
-│       ├── SQL.java
-│       ├── QueryBuilder.java
-│       ├── SelectBuilder.java
-│       ├── InsertBuilder.java
-│       ├── UpdateBuilder.java
-│       ├── DeleteBuilder.java
-│       ├── BatchInsertBuilder.java
-│       ├── RawQueryBuilder.java
-│       ├── SimpleQuery.java
-│       └── SqlScriptParser.java
-│
-├── hex-db-executor/
-│   └── src/main/java/com/framework/hex/db/executor/
-│       ├── DefaultQueryExecutor.java
-│       ├── SelectQueryResult.java
-│       ├── ModificationQueryResult.java
-│       └── MapRow.java
-│
-└── hex-db/
-    └── src/main/java/com/framework/hex/db/
-        ├── Db.java
-        ├── DbInstance.java
-        ├── DbConfig.java
-        └── interceptors/
-            └── LoggingInterceptor.java
+hex-core-db/
+├── pom.xml                 ← HikariCP, SLF4J
+└── src/main/java/com/company/hex/db/
+    │
+    ├── core/               ← Интерфейсы и базовые типы
+    │   ├── Row.java
+    │   ├── RowMapper.java
+    │   ├── Query.java
+    │   ├── QueryResult.java
+    │   ├── QueryExecutor.java
+    │   └── QueryInterceptor.java
+    │
+    ├── builders/           ← Fluent API билдеры
+    │   ├── SQL.java
+    │   ├── QueryBuilder.java
+    │   ├── SelectBuilder.java
+    │   ├── ExecutableSelectBuilder.java
+    │   ├── InsertBuilder.java
+    │   ├── ExecutableInsertBuilder.java
+    │   ├── UpdateBuilder.java
+    │   ├── ExecutableUpdateBuilder.java
+    │   ├── DeleteBuilder.java
+    │   ├── ExecutableDeleteBuilder.java
+    │   ├── BatchInsertBuilder.java
+    │   ├── ExecutableBatchInsertBuilder.java
+    │   ├── RawQueryBuilder.java
+    │   ├── ExecutableRawBuilder.java
+    │   ├── SimpleQuery.java
+    │   └── SqlScriptParser.java
+    │
+    ├── executor/           ← Выполнение запросов
+    │   ├── DefaultQueryExecutor.java
+    │   ├── SelectQueryResult.java
+    │   ├── ModificationQueryResult.java
+    │   └── MapRow.java
+    │
+    ├── Db.java             ← Главная точка входа (статический API)
+    ├── DbInstance.java     ← Экземпляр для multi-datasource
+    ├── DbConfig.java       ← Конфигурация
+    ├── DbException.java    ← Исключения
+    └── LoggingInterceptor.java  ← Логирование SQL
 ```
 
 ---
